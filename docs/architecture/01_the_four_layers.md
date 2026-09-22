@@ -32,9 +32,28 @@ Is this the same model as the reference.
 Implemented by `planteo`'s canonical form, which normalises names, term order and comparator
 orientation. Equal canonical form proves equivalence.
 
-**Unequal canonical form proves nothing**, so this layer reports `UNDECIDED` rather than `FAIL` in
-that case, and the property layer carries the decision. Reporting a canonicalisation artifact as a
-failure would manufacture false negatives, and the number would be worse than no number.
+**Unequal canonical form proves nothing**, so it is never a failure on its own. But it is not the
+end of the comparison either, and treating it as the end was a real defect here.
+
+Two formalizations of the *same case* that solve to **different optima** are not the same model.
+That direction is conclusive, and it is the only way this layer can fail a candidate:
+
+| Canonical form | Optima | Verdict |
+|---|---|---|
+| equal | (not consulted) | `PASS`, equivalence proven |
+| differ | differ | `FAIL`, they are different models |
+| differ | agree | `UNDECIDED`, agreement does not prove equivalence |
+
+The asymmetry in the last two rows is the honest part. A matching optimum never promotes a verdict
+to `PASS`, because **compensating errors reach the right number**, which is precisely the failure
+the anchor survey documents.
+
+**Why this exists.** The first version of this layer stopped at `UNDECIDED`, and on the first real
+frontier measurement it returned `UNDECIDED` on *every single* candidate that ran. The whole
+faithfulness rate therefore rested on internal invariants that had never failed anything, and the
+reported gap was exactly `+0.000`. A rate carried by a check that cannot fail is not a measurement.
+With refutation added, the same corpus and the same model report `+0.100`: two candidates that ran
+cleanly solve to 16 and 8080 where the references solve to 16.667 and 8200.
 
 If a case has no reference formalization, this layer reports `NOT_APPLICABLE` instead of inventing
 an opinion.
