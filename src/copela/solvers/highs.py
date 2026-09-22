@@ -22,6 +22,15 @@ class SolverUnavailable(RuntimeError):
     """The requested solver is not installed. Distinct from a model that failed to solve."""
 
 
+class ModelNotSupported(RuntimeError):
+    """This solver cannot take this model, though the model may be perfectly valid.
+
+    A linear solver handed a nonlinear model is a limitation of the harness, not a defect in the
+    formalization. Recording it as a model failure blames the subject for the instrument, which is
+    the exact error this whole product exists to expose, so it gets its own type.
+    """
+
+
 def solve(
     problem: Problem,
     solver_name: str = DEFAULT_SOLVER,
@@ -59,7 +68,18 @@ def solve(
     # outcome here (the corpus contains deliberately contradictory cases, because noticing that a
     # problem has no answer is part of what is being measured), and an interface that raises on it
     # would turn the correct result into a harness error.
-    results = _solve_without_loading(solver, model)
+    try:
+        results = _solve_without_loading(solver, model)
+    except Exception as error:
+        # Pyomo reports a model this solver cannot express as a degree error. It is a capability
+        # limit, not an invalid model, and the two must not be recorded the same way.
+        text = str(error)
+        if "degree" in text or "nonlinear" in text.lower() or "quadratic" in text.lower():
+            raise ModelNotSupported(
+                f"{solver_name} cannot express this model: {text}"
+            ) from error
+        raise
+
     condition = str(results.solver.termination_condition)
 
     if condition in {"infeasible", "infeasibleOrUnbounded"}:

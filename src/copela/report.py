@@ -46,6 +46,10 @@ class Cell:
     family: str
     ran: Rate
     faithful: Rate
+    #: Calls this harness could not measure, for instance a valid model the chosen solver cannot
+    #: express. They are excluded from both rates: counting a limitation of the instrument against
+    #: the subject is the error this whole product exists to expose.
+    unmeasured: int = 0
 
     @property
     def gap(self) -> float:
@@ -70,9 +74,14 @@ class Cell:
             if self.gap_is_defined
             else "gap UNDEFINED, nothing reached the faithfulness layers"
         )
+        skipped = (
+            f"  ({self.unmeasured} unmeasured, the solver could not express them)"
+            if self.unmeasured
+            else ""
+        )
         return (
             f"{self.provider}/{self.model_id} [{self.family}]  "
-            f"ran {self.ran.describe()}  faithful {self.faithful.describe()}  {gap}"
+            f"ran {self.ran.describe()}  faithful {self.faithful.describe()}  {gap}{skipped}"
         )
 
     def to_json(self) -> dict[str, object]:
@@ -84,6 +93,7 @@ class Cell:
             "faithful": self.faithful.to_json(),
             "gap": self.gap if self.gap_is_defined else None,
             "gap_is_defined": self.gap_is_defined,
+            "unmeasured": self.unmeasured,
         }
 
 
@@ -124,11 +134,15 @@ class Report:
         return "\n".join(lines)
 
 
+# The note says "whatever a provider exposes" rather than "at temperature zero", because several
+# current models expose no temperature at all. Naming a control that does not exist would be the
+# same species of unchecked claim this report is built to detect.
 _REPORT_NOTE = (
     "The layers are reported separately by design. There is no combined score: a single number "
     "would let a high 'it ran' rate conceal a low 'it was right' rate, which is the distance this "
-    "report exists to show. Rates are over repeats with a Wilson interval; hosted inference is not "
-    "deterministic at temperature zero, so a single run is not a result."
+    "report exists to show. Rates are over repeats with a Wilson interval, because pinning "
+    "whatever controls a provider exposes does not make hosted inference deterministic, so a "
+    "single run is not a result."
 )
 
 _JUDGE_NOTE = (
@@ -142,10 +156,20 @@ def build(ledger: Ledger) -> Report:
     ran: dict[tuple[str, str, str], list[bool]] = defaultdict(list)
     faithful: dict[tuple[str, str, str], list[bool]] = defaultdict(list)
     judged: dict[tuple[str, str], list[bool]] = defaultdict(list)
+    unmeasured: dict[tuple[str, str, str], int] = defaultdict(int)
 
     for record in ledger:
         key = (record.key.provider, record.key.model_id, record.family)
         verdict = _verdict_of(record)
+
+        executable = verdict.of(Layer.EXECUTABLE)
+        if executable is not None and executable.outcome is Outcome.NOT_APPLICABLE:
+            # Not a pass and not a failure: the harness could not measure it. It leaves both
+            # denominators and is reported on its own, because a rate that silently absorbs the
+            # instrument's blind spots is a rate about the instrument.
+            unmeasured[key] += 1
+            continue
+
         ran[key].append(verdict.ran)
         # A candidate that never ran cannot be faithful, and it counts as an observation: dropping
         # it would inflate the faithful rate by quietly shrinking its denominator.
@@ -166,8 +190,9 @@ def build(ledger: Ledger) -> Report:
                 sum(faithful[(provider, model_id, family)]),
                 len(faithful[(provider, model_id, family)]),
             ),
+            unmeasured=unmeasured[(provider, model_id, family)],
         )
-        for (provider, model_id, family) in sorted(ran)
+        for (provider, model_id, family) in sorted(set(ran) | set(unmeasured))
     )
 
     judge = tuple(

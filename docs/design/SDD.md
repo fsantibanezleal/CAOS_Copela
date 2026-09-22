@@ -165,9 +165,13 @@ R-017  WHEN a candidate and its reference solve the same case to different optim
 R-018  WHEN a candidate and its reference solve to the same optimum but differ in canonical form,
        THE structural layer SHALL report UNDECIDED, and SHALL NOT report PASS.
        Gate: tests/test_sweep.py::test_a_matching_optimum_does_not_prove_equivalence
+
+R-019  IF the configured solver cannot express a candidate, THEN THE report SHALL exclude that call
+       from both rates and count it as unmeasured.
+       Gate: tests/test_report.py::test_an_unmeasurable_run_leaves_the_rates_rather_than_counting_against_the_model
 ```
 
-R-013 to R-018 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-019 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -203,7 +207,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-018 | all pass, no skips |
+| R-001 to R-019 | all pass, no skips |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

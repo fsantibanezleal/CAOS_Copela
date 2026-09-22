@@ -246,3 +246,45 @@ def test_a_gap_with_nothing_running_is_undefined_not_zero(ledger_path) -> None:
     assert "UNDEFINED" in cell.describe()
     assert build(ledger).to_json()["cells"][0]["gap"] is None
     assert "UNDEFINED" in build(ledger).to_text()
+
+
+def test_an_unmeasurable_run_leaves_the_rates_rather_than_counting_against_the_model(
+    ledger_path,
+) -> None:
+    """R-019: a call the harness could not measure is excluded from both rates.
+
+    Measured on a real sweep: a model produced a formalization the chosen linear solver could not
+    express. Recording that as a model failure blames the subject for the instrument, which is the
+    exact error this product exists to expose.
+    """
+    ledger = Ledger(ledger_path)
+
+    def add(repeat: int, outcome: Outcome, detail: str = "") -> None:
+        ledger.append(
+            Record(
+                key=CallKey("c", "stub", "m", repeat),
+                family="optimization",
+                model_version="v",
+                temperature=0.0,
+                seed=1,
+                provider_fingerprint="f",
+                prompt_digest="p",
+                response_digest="r",
+                latency_ms=1.0,
+                input_tokens=1,
+                output_tokens=1,
+                cost_usd=0.0,
+                verdicts=[LayerResult(Layer.EXECUTABLE, outcome, detail).to_json()],
+            )
+        )
+
+    add(0, Outcome.PASS)
+    add(1, Outcome.FAIL)
+    add(2, Outcome.NOT_APPLICABLE, "not measured: the solver cannot express this model")
+
+    cell = build(ledger).cells[0]
+    assert cell.ran.total == 2, "the unmeasurable run stayed in the denominator"
+    assert cell.ran.passed == 1
+    assert cell.unmeasured == 1
+    assert "1 unmeasured" in cell.describe()
+    assert build(ledger).to_json()["cells"][0]["unmeasured"] == 1
