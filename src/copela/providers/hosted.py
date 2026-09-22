@@ -175,8 +175,19 @@ class OllamaProvider(Provider):
 
     name = "ollama"
 
-    def __init__(self, host: str | None = None) -> None:
+    def __init__(self, host: str | None = None, think: bool | None = None) -> None:
+        """``think`` controls a reasoning model's visible reasoning.
+
+        It matters more than it looks. A reasoning model spends its output budget on reasoning
+        first, so a small one can emit three thousand tokens of thought, hit the limit, and return
+        nothing at all. Measured on qwen3.5:4b: every call produced about 3100 tokens of reasoning
+        and no answer, which reads as a total formalization failure and is actually a truncation.
+
+        ``None`` leaves the model's default alone, ``False`` asks it to answer directly. Whichever
+        is used goes in the run record, because it changes what is being measured.
+        """
         self._host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        self._think = think
 
     def complete(
         self,
@@ -198,9 +209,16 @@ class OllamaProvider(Provider):
         if seed is not None:
             options["seed"] = seed
 
-        payload = json.dumps(
-            {"model": model_id, "prompt": prompt, "stream": False, "options": options}
-        ).encode("utf-8")
+        body: dict[str, object] = {
+            "model": model_id,
+            "prompt": prompt,
+            "stream": False,
+            "options": options,
+        }
+        if self._think is not None:
+            body["think"] = self._think
+
+        payload = json.dumps(body).encode("utf-8")
         request = urllib.request.Request(
             f"{self._host}/api/generate",
             data=payload,
@@ -209,21 +227,33 @@ class OllamaProvider(Provider):
 
         started = time.perf_counter()
         try:
-            with urllib.request.urlopen(request, timeout=600) as response:
-                body = json.loads(response.read().decode("utf-8"))
+            with urllib.request.urlopen(request, timeout=900) as response:
+                response_body = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"ollama call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
 
+        text = response_body.get("response", "")
+        if not text and response_body.get("thinking"):
+            # The model reasoned and produced no answer, which is a truncation rather than a
+            # refusal. Saying so in the text means the ledger records WHY instead of an empty
+            # string that reads like a model that had nothing to say.
+            reasoned = len(str(response_body["thinking"]))
+            text = (
+                f"[no answer: the model emitted {reasoned} characters of reasoning and stopped "
+                "before answering. Raise max_tokens or set think=False]"
+            )
+
         return Completion(
-            text=body.get("response", ""),
+            text=text,
             model_id=model_id,
-            model_version=str(body.get("model", model_id)),
-            # A local model's serving configuration is the host itself, which is stable and worth
-            # recording: the same weights on two machines are not the same lane.
-            fingerprint=f"ollama@{self._host}",
-            input_tokens=int(body.get("prompt_eval_count", 0)),
-            output_tokens=int(body.get("eval_count", 0)),
+            model_version=str(response_body.get("model", model_id)),
+            # A local model's serving configuration is the host itself, plus whether reasoning was
+            # on, because that changes what is being measured. The same weights on two machines,
+            # or with reasoning toggled, are not the same lane.
+            fingerprint=f"ollama@{self._host}#think={self._think}",
+            input_tokens=int(response_body.get("prompt_eval_count", 0)),
+            output_tokens=int(response_body.get("eval_count", 0)),
             latency_ms=latency_ms,
             pricing=Pricing(),  # local inference has no per-token price
         )

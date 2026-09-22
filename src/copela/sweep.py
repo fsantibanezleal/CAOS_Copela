@@ -65,6 +65,12 @@ class Sweep:
     temperature: float = 0.0
     seed: int | None = 20260922
     expected_output_tokens: int = 1200
+    #: How much of a failing response to keep in the ledger, in characters.
+    excerpt_chars: int = 2000
+    #: Hard cap per call. A formalization document runs to a few thousand tokens, and a cap set
+    #: for chat-sized replies truncates it into a failure that looks like the model could not do
+    #: the task.
+    max_tokens: int = 8192
 
     def run(self, cases: Sequence[Case], targets: Sequence[Target]) -> int:
         """Run the sweep. Returns the number of calls made in this invocation."""
@@ -123,6 +129,7 @@ class Sweep:
                 model_id=target.model_id,
                 temperature=self.temperature,
                 seed=self.seed,
+                max_tokens=self.max_tokens,
             )
         except ProviderError as failure:
             error = str(failure)
@@ -231,6 +238,24 @@ class Sweep:
             "canonical forms differ, which does not establish that the models differ",
         )
 
+    def _excerpt(self, completion, verdicts: list[LayerResult]) -> str:
+        """Keep a bounded excerpt of the response, but only when something failed.
+
+        A successful run is described by its verdicts. A failed one is not: a digest says a
+        response existed and nothing about what was wrong with it, and re-running to reproduce does
+        not work because hosted inference is not deterministic.
+        """
+        failed = any(v.outcome is Outcome.FAIL for v in verdicts)
+        if not failed or completion is None:
+            return ""
+        text = completion.text
+        if len(text) <= self.excerpt_chars:
+            return text
+        half = self.excerpt_chars // 2
+        omitted = len(text) - self.excerpt_chars
+        middle = f"[... {omitted} characters omitted ...]"
+        return "\n".join((text[:half], middle, text[-half:]))
+
     def _record(
         self,
         key: CallKey,
@@ -256,5 +281,6 @@ class Sweep:
                 cost_usd=completion.cost_usd if completion else 0.0,
                 verdicts=[v.to_json() for v in verdicts],
                 error=error,
+                response_excerpt=self._excerpt(completion, verdicts),
             )
         )

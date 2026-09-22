@@ -67,6 +67,14 @@ class Record:
     cost_usd: float
     verdicts: list[dict[str, object]] = field(default_factory=list)
     error: str = ""
+    #: A bounded excerpt of the raw response, kept ONLY when the call failed.
+    #:
+    #: A digest proves a response existed and says nothing about what was wrong with it. Diagnosing
+    #: a failure from a digest is impossible, and re-running to reproduce does not work either:
+    #: hosted inference is not deterministic, so the failure may not come back. The excerpt is
+    #: bounded because a ledger is evidence, not a transcript archive, and it is kept only on
+    #: failure because a successful run is already described by its verdicts.
+    response_excerpt: str = ""
     recorded_at: str = ""
 
     def to_json(self) -> dict[str, object]:
@@ -89,6 +97,7 @@ class Record:
             "cost_usd": self.cost_usd,
             "verdicts": self.verdicts,
             "error": self.error,
+            "response_excerpt": self.response_excerpt,
             "recorded_at": self.recorded_at
             or datetime.now(UTC).isoformat(timespec="seconds"),
         }
@@ -116,6 +125,7 @@ class Record:
             cost_usd=float(data.get("cost_usd", 0.0)),  # type: ignore[arg-type]
             verdicts=list(data.get("verdicts", [])),  # type: ignore[arg-type]
             error=str(data.get("error", "")),
+            response_excerpt=str(data.get("response_excerpt", "")),
             recorded_at=str(data.get("recorded_at", "")),
         )
 
@@ -131,12 +141,60 @@ REQUIRED_PROVENANCE = (
 )
 
 
-class Ledger:
-    """An append-only JSONL file of call records."""
+class LedgerBusy(LedgerError):
+    """Another process holds this ledger."""
 
-    def __init__(self, path: str | os.PathLike[str]) -> None:
+
+class Ledger:
+    """An append-only JSONL file of call records.
+
+    ``exclusive=True`` takes a lock for the lifetime of the object, so two sweeps cannot write one
+    ledger. That is not hypothetical: a sweep was started while an earlier one was still alive, both
+    appended to the same file, and the result interleaved records from two different versions of the
+    code. Append-only does not help there, because the two processes write different keys, so
+    nothing collides and nothing complains. The file simply stops meaning one thing.
+    """
+
+    def __init__(self, path: str | os.PathLike[str], exclusive: bool = False) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        self._holds_lock = False
+        if exclusive:
+            self._acquire()
+
+    def _acquire(self) -> None:
+        try:
+            # O_EXCL is the whole mechanism: creating the file IS the lock, atomically.
+            descriptor = os.open(self._lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            holder = ""
+            try:
+                holder = self._lock_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                pass
+            raise LedgerBusy(
+                f"{self.path} is locked by {holder or 'another process'}. Two sweeps writing one "
+                f"ledger interleave their records and the file stops meaning one thing. "
+                f"Stop the other run, or delete {self._lock_path.name} if it is stale"
+            ) from None
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(
+                f"pid {os.getpid()} since "
+                f"{datetime.now(UTC).isoformat(timespec='seconds')}\n"
+            )
+        self._holds_lock = True
+
+    def release(self) -> None:
+        if self._holds_lock:
+            self._lock_path.unlink(missing_ok=True)
+            self._holds_lock = False
+
+    def __enter__(self) -> Ledger:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.release()
 
     # -- writing ---------------------------------------------------------------------
 

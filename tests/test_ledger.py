@@ -121,3 +121,101 @@ def test_total_cost_sums_the_ledger(ledger_path) -> None:
     ledger.append(make_record(key=CallKey("a", "stub", "m", 0), cost_usd=0.10))
     ledger.append(make_record(key=CallKey("b", "stub", "m", 0), cost_usd=0.25))
     assert ledger.total_cost_usd == pytest.approx(0.35)
+
+
+def test_two_sweeps_cannot_share_one_ledger(ledger_path) -> None:
+    """R-014: an exclusive ledger refuses a second holder.
+
+    Not hypothetical. A sweep was started while an earlier one was still alive; both appended to
+    the same file and the result interleaved records from two versions of the code. Append-only
+    does not catch it, because the two processes write different keys, so nothing collides. The
+    file just stops meaning one thing.
+    """
+    from copela.ledger import LedgerBusy
+
+    first = Ledger(ledger_path, exclusive=True)
+    try:
+        with pytest.raises(LedgerBusy) as caught:
+            Ledger(ledger_path, exclusive=True)
+        assert "locked by" in str(caught.value)
+        assert "pid" in str(caught.value)
+    finally:
+        first.release()
+
+    # Released, so the next run may take it.
+    second = Ledger(ledger_path, exclusive=True)
+    second.release()
+
+
+def test_a_non_exclusive_ledger_is_unaffected(ledger_path) -> None:
+    """Reading a ledger must never need the lock: a report runs while a sweep is running."""
+    holder = Ledger(ledger_path, exclusive=True)
+    try:
+        reader = Ledger(ledger_path)
+        assert reader.records() == []
+    finally:
+        holder.release()
+
+
+def test_the_lock_is_released_by_the_context_manager(ledger_path) -> None:
+    with Ledger(ledger_path, exclusive=True):
+        pass
+    Ledger(ledger_path, exclusive=True).release()
+
+
+def test_a_failing_response_is_excerpted_for_diagnosis(ledger_path) -> None:
+    """R-015: a failed call keeps a bounded excerpt; a successful one does not.
+
+    A digest proves a response existed and says nothing about what was wrong with it. Re-running to
+    reproduce does not work either: inference is not deterministic, so the failure may not come
+    back. The excerpt is bounded because a ledger is evidence, not a transcript archive.
+    """
+    import json as _json
+
+    from copela import Budget, Case, StubProvider, Sweep, Target
+
+    long_garbage = "this is not a json document. " * 200
+    provider = StubProvider(default=long_garbage)
+    ledger = Ledger(ledger_path)
+
+    def parse(text: str, case):
+        from planteo import Problem
+
+        return Problem.from_json(_json.loads(text))
+
+    sweep = Sweep(
+        ledger=ledger,
+        budget=Budget(limit_usd=1.0),
+        providers={"stub": provider},
+        build_prompt=lambda case: "formalize this",
+        parse_response=parse,
+        repeats=1,
+        excerpt_chars=400,
+    )
+    sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
+
+    record = ledger.records()[0]
+    assert record.response_excerpt, "a failing response was not excerpted"
+    assert "this is not a json document" in record.response_excerpt
+    assert len(record.response_excerpt) < len(long_garbage)
+    assert "characters omitted" in record.response_excerpt
+
+
+def test_a_successful_response_is_not_excerpted(ledger_path, blend_json) -> None:
+    """A run that worked is described by its verdicts; keeping its text would be an archive."""
+    import json as _json
+
+    from copela import Budget, Case, StubProvider, Sweep, Target
+
+    provider = StubProvider(default=blend_json)
+    ledger = Ledger(ledger_path)
+    sweep = Sweep(
+        ledger=ledger,
+        budget=Budget(limit_usd=1.0),
+        providers={"stub": provider},
+        build_prompt=lambda case: "formalize this",
+        parse_response=lambda text, case: __import__("planteo").Problem.from_json(_json.loads(text)),
+        repeats=1,
+    )
+    sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
+    assert ledger.records()[0].response_excerpt == ""

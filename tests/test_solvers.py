@@ -30,6 +30,7 @@ def test_an_infeasible_model_returns_a_result_rather_than_raising() -> None:
     import dataclasses
 
     from planteo import Comparator, Compare, Constant, Dimension, Ref
+
     from tests.conftest import make_blend
 
     TONNE = Dimension.of("t", mass=1)
