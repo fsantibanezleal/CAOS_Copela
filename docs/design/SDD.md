@@ -142,7 +142,17 @@ R-011  IF a provider returns a response that does not parse into a Problem, THEN
 
 R-012  THE offline sweep SHALL be resumable from its ledger without repeating completed calls.
        Gate: tests/test_ledger.py::test_completed_calls_are_not_repeated
+
+R-013  IF a model is infeasible, THEN THE solver wrapper SHALL return a result recording that,
+       and SHALL NOT raise.
+       Gate: tests/test_solvers.py::test_an_infeasible_model_returns_a_result_rather_than_raising
 ```
+
+R-013 was added after the fact, which is worth recording rather than tidying away. The corpus
+contains deliberately contradictory cases, because noticing that a problem has no answer is part of
+what is being measured. The first such case turned the correct verdict into a harness crash, and the
+cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
+setting on every call, so suppressing the load through the config is silently discarded.
 
 ## 10. Convergence
 
@@ -150,7 +160,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-012 | all pass, 40 tests, no skips |
+| R-001 to R-013 | all pass, 43 tests, no skips |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
