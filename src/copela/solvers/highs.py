@@ -55,7 +55,11 @@ def solve(
     if time_limit_s is not None:
         _apply_time_limit(solver, solver_name, time_limit_s)
 
-    results = solver.solve(model)
+    # Do not let the interface load a solution it may not have. An infeasible model is an ordinary
+    # outcome here (the corpus contains deliberately contradictory cases, because noticing that a
+    # problem has no answer is part of what is being measured), and an interface that raises on it
+    # would turn the correct result into a harness error.
+    results = _solve_without_loading(solver, model)
     condition = str(results.solver.termination_condition)
 
     if condition in {"infeasible", "infeasibleOrUnbounded"}:
@@ -72,6 +76,9 @@ def solve(
             detail=f"solver stopped: {condition}",
         )
 
+    # The solution exists but was not loaded, because loading was suppressed above.
+    _load_solution(solver, model)
+
     values = {
         variable.name: float(pyo.value(variable))
         for variable in model.component_data_objects(pyo.Var, active=True)
@@ -82,6 +89,50 @@ def solve(
     return Solution(
         feasible=True, objective=objective, values=values, detail=condition
     )
+
+
+def _solve_without_loading(solver, model):
+    """Solve without loading a solution, across the two Pyomo solver interfaces.
+
+    The appsi interfaces take ``config.load_solution``; the legacy ones take a ``load_solutions``
+    keyword. Neither is universal, so both are tried and the plain call is the fallback. The plain
+    call is the one that raises on an infeasible model, so it is last.
+    """
+    import inspect
+
+    # The keyword comes FIRST. Pyomo's appsi legacy wrapper copies its own ``load_solutions``
+    # argument over ``config.load_solution`` on every call, so setting the config beforehand is
+    # silently discarded. That is the kind of thing only a failing infeasible case reveals.
+    try:
+        parameters = inspect.signature(solver.solve).parameters
+    except (TypeError, ValueError):
+        parameters = {}
+    if "load_solutions" in parameters:
+        return solver.solve(model, load_solutions=False)
+
+    config = getattr(solver, "config", None)
+    if config is not None and hasattr(config, "load_solution"):
+        previous = config.load_solution
+        config.load_solution = False
+        try:
+            return solver.solve(model)
+        finally:
+            config.load_solution = previous
+
+    return solver.solve(model)
+
+
+def _load_solution(solver, model) -> None:
+    """Load a solution that was deliberately not loaded during the solve."""
+    try:
+        solver.load_vars()
+        return
+    except (AttributeError, RuntimeError):
+        pass
+    try:
+        model.solutions.load_from(solver._last_results_object)  # noqa: SLF001, no public path
+    except Exception:  # noqa: BLE001, a failed load is reported by the caller's empty values
+        pass
 
 
 def _apply_time_limit(solver, solver_name: str, seconds: float) -> None:
