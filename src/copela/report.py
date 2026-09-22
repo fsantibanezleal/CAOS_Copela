@@ -49,14 +49,30 @@ class Cell:
 
     @property
     def gap(self) -> float:
-        """The headline. Positive means the artifact ran more often than it was right."""
+        """The headline. Positive means the artifact ran more often than it was right.
+
+        ``nan`` when nothing ran, because the gap is then UNDEFINED rather than zero. A model that
+        failed every call would otherwise be reported as ``gap +0.000``, which reads as "no gap"
+        and means "no measurement". That is the exact confusion this product exists to prevent, so
+        making it here would be unforgivable.
+        """
+        if self.ran.total == 0 or self.ran.passed == 0:
+            return float("nan")
         return self.ran.value - self.faithful.value
 
+    @property
+    def gap_is_defined(self) -> bool:
+        return self.ran.passed > 0
+
     def describe(self) -> str:
+        gap = (
+            f"gap {self.gap:+.3f}"
+            if self.gap_is_defined
+            else "gap UNDEFINED, nothing reached the faithfulness layers"
+        )
         return (
             f"{self.provider}/{self.model_id} [{self.family}]  "
-            f"ran {self.ran.describe()}  faithful {self.faithful.describe()}  "
-            f"gap {self.gap:+.3f}"
+            f"ran {self.ran.describe()}  faithful {self.faithful.describe()}  {gap}"
         )
 
     def to_json(self) -> dict[str, object]:
@@ -66,7 +82,8 @@ class Cell:
             "family": self.family,
             "ran": self.ran.to_json(),
             "faithful": self.faithful.to_json(),
-            "gap": self.gap,
+            "gap": self.gap if self.gap_is_defined else None,
+            "gap_is_defined": self.gap_is_defined,
         }
 
 
@@ -93,7 +110,11 @@ class Report:
 
     def to_text(self) -> str:
         lines = ["gap report", "=" * 60, ""]
-        for cell in sorted(self.cells, key=lambda c: (c.family, -c.gap)):
+        # Undefined gaps sort last rather than crashing the comparison on nan.
+        for cell in sorted(
+            self.cells,
+            key=lambda c: (c.family, 0 if c.gap_is_defined else 1, -c.gap if c.gap_is_defined else 0),
+        ):
             lines.append("  " + cell.describe())
         if self.judge:
             lines += ["", "judge layer (screening aggregate, not an oracle):"]
