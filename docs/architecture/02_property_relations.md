@@ -47,6 +47,19 @@ If the candidate never solved, no relation could be evaluated, and the layer rep
 Counting either as a pass would report a number that was never measured. This is R-009 and it has
 its own gate.
 
+## What these relations do NOT check
+
+Every relation here is an **internal** invariant: it compares a model against transformations of
+itself. None of them compares the candidate's answer to the reference's.
+
+That gap is not theoretical. On the first real frontier measurement the property layer passed every
+candidate that ran, while two of those candidates were solving to the wrong optimum. Internal
+consistency is necessary and it is not sufficient: a model can be perfectly self-consistent and
+still be a model of a different problem.
+
+Comparing against the reference belongs to the structural layer, which does it by refutation. See
+[`01_the_four_layers.md`](01_the_four_layers.md).
+
 ## The kill criterion
 
 A property layer that never fails anything is decoration.

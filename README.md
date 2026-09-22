@@ -15,11 +15,15 @@ the job here, separating a formalization that is faithful from one that merely r
 gap report
 ============================================================
 
-  anthropic/claude-sonnet-5 [optimization]  ran 0.940 [0.832, 0.981] n=50  faithful 0.720 [0.584, 0.826] n=50  gap +0.220
+  anthropic/claude-haiku-4-5 [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.250 [0.112, 0.469] over n=20  gap +0.100
 ```
 
-**ran** is what the field reports. **faithful** is what was asked for. The gap between them is the
-output, and no source found reports it across target families.
+That is a real run, not an illustration: 20 authored optimization cases, one repeat, measured
+2026-09-22. **ran** is what the field reports. **faithful** is what was asked for. The gap between
+them is the output, and no source found reports it across target families.
+
+Twenty cases at one repeat is a wide interval. It is enough to see a gap and not enough to rank
+close models, which is exactly why the interval is printed next to the number.
 
 That gap is not hypothetical. Where it has been measured carefully, in natural-language to Lean
 formalization, it runs [3.0 to 29.0 percentage points](https://arxiv.org/abs/2606.31002), and the
@@ -30,7 +34,7 @@ strongest system measured had the largest gap: 89.5% compiling, 60.5% faithful.
 | Layer | Asks | Strength |
 |---|---|---|
 | **executable** | did it run, solve, compile | necessary, weak, the layer the field over-reports |
-| **structural** | is it the same model as the reference | strong where it applies |
+| **structural** | is it the same model as the reference | the only layer that can refute |
 | **property** | do the invariants of this class hold | strong, catches what structure misses |
 | **judge** | what would a model say | a labelled screening aggregate, never truth |
 
@@ -41,6 +45,13 @@ show.
 The judge layer is reported because the literature reports it and comparability matters. It carries
 a label on every record saying it is not an oracle, because the study that calibrated a two-judge
 consensus against human majority states exactly that.
+
+**The structural layer is the one that can say no.** Canonical equality proves equivalence; unequal
+canonical form proves nothing; but two formalizations of the same case that solve to *different
+optima* are not the same model, and that is conclusive. A matching optimum never promotes a verdict
+to pass, because compensating errors reach the right number. Without that direction the whole
+faithfulness rate rests on internal invariants that cannot fail, which is a rubber stamp with an
+interval printed on it.
 
 ## The property layer
 
@@ -113,9 +124,11 @@ Temperature zero does not make hosted inference deterministic. The dominant caus
 dependence of reduction kernels rather than floating-point non-associativity, and bitwise
 determinism costs a third to two thirds of throughput and cannot be bought over a hosted API.
 
-So the harness pins what it can (model, version, temperature, seed, provider fingerprint), records
-`n` repeats, and reports a **rate with a Wilson interval**. It never presents a single run as the
-result, and 5 of 5 is not reported as certainly 1.0.
+So the harness pins what it can and records **what it actually pinned**, which is not the same set
+for every provider: current Claude models accept no `temperature` and no `seed` at all, so a ledger
+row for them says `no-temperature` and records the effort level instead of a sampling parameter
+nobody set. It records `n` repeats and reports a **rate with a Wilson interval**, never presents a
+single run as the result, and does not report 5 of 5 as certainly 1.0.
 
 ## The ledger
 
@@ -131,7 +144,7 @@ that **would** exceed the ceiling rather than noticing afterwards.
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its twelve requirements names the test that
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its eighteen requirements names the test that
 verifies it.
 
 ## Related
