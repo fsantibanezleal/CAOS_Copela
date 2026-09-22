@@ -157,9 +157,17 @@ R-015  WHEN a call fails, THE ledger SHALL record a bounded excerpt of the respo
 R-016  IF nothing reached the faithfulness layers, THEN THE report SHALL state the gap as
        UNDEFINED, and SHALL NOT report it as zero.
        Gate: tests/test_report.py::test_a_gap_with_nothing_running_is_undefined_not_zero
+
+R-017  WHEN a candidate and its reference solve the same case to different optima, THE structural
+       layer SHALL report FAIL.
+       Gate: tests/test_sweep.py::test_a_different_optimum_refutes_equivalence
+
+R-018  WHEN a candidate and its reference solve to the same optimum but differ in canonical form,
+       THE structural layer SHALL report UNDECIDED, and SHALL NOT report PASS.
+       Gate: tests/test_sweep.py::test_a_matching_optimum_does_not_prove_equivalence
 ```
 
-R-013 to R-016 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-018 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -177,13 +185,25 @@ R-016 came from the first completed sweep. A local model failed all ten calls an
 failure this product exists to expose, so making it here would be unforgivable. The gap is now
 undefined when nothing ran, and the text output says so in words.
 
+R-017 and R-018 came from auditing the first real frontier measurement against the kill criterion
+in section 11. Haiku 4.5 reported a gap of exactly zero, and the audit found why: the structural
+layer returned UNDECIDED on **every** candidate that ran, so the entire faithfulness rate rested on
+internal invariants that had never failed anything. A rate carried by a check that cannot fail is
+not a measurement.
+
+The fix is the one conclusive direction that was missing. Canonical inequality proves nothing, but
+two formalizations of the same case that solve to different optima are not the same model, and that
+IS conclusive. The asymmetry is deliberate and is the honest part: a matching optimum never promotes
+a verdict to PASS, because compensating errors reach the right number, which is the failure the
+anchor survey documents.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-016 | all pass, no skips |
+| R-001 to R-018 | all pass, no skips |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

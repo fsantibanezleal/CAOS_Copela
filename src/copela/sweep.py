@@ -216,6 +216,22 @@ class Sweep:
         return results
 
     def _structural(self, candidate: Problem, case: Case) -> LayerResult:
+        """Compare the candidate against the reference, by form and then by answer.
+
+        Canonical equality proves equivalence. Canonical inequality proves nothing on its own, but
+        it is not the end of the comparison: **two formalizations of the same case that solve to
+        different optima are not the same model.** That direction IS conclusive, and without it this
+        layer can only ever say PASS or shrug.
+
+        It matters more than it sounds. Measured on this corpus, the layer returned UNDECIDED on
+        every single candidate that ran, so the whole faithfulness rate rested on internal
+        invariants that never failed anything. A rate carried by a check that cannot fail is not a
+        measurement.
+
+        Note the asymmetry, which is the honest part: a matching optimum does NOT promote a verdict
+        to PASS. Compensating errors reach the right number, which is the very failure the anchor
+        survey documents. Answer agreement can only ever REFUTE.
+        """
         if case.reference is None:
             return LayerResult(
                 Layer.STRUCTURAL,
@@ -229,14 +245,49 @@ class Sweep:
             return LayerResult(
                 Layer.STRUCTURAL, Outcome.PASS, "canonical forms are equal"
             )
-        # Canonical inequality proves nothing, so this is UNDECIDED rather than FAIL and the
-        # property layer carries the decision. Reporting it as a failure would manufacture false
-        # negatives out of a normalisation artifact.
+
+        disagreement = self._answers_disagree(candidate, case)
+        if disagreement is not None:
+            return LayerResult(Layer.STRUCTURAL, Outcome.FAIL, disagreement)
+
         return LayerResult(
             Layer.STRUCTURAL,
             Outcome.UNDECIDED,
-            "canonical forms differ, which does not establish that the models differ",
+            "canonical forms differ and both solve to the same optimum, which does not establish "
+            "equivalence: compensating errors reach the right number",
         )
+
+    def _answers_disagree(self, candidate: Problem, case: Case) -> str | None:
+        """Return a reason when candidate and reference solve to different optima, else None.
+
+        Returns None whenever the comparison cannot be made, because an unmade comparison must
+        never read as a failure any more than it may read as a pass.
+        """
+        if self.solve is None or case.reference is None:
+            return None
+        try:
+            mine = self.solve(candidate)
+            theirs = self.solve(case.reference)
+        except Exception:  # noqa: BLE001, an unsolvable pair simply cannot be compared
+            return None
+
+        if mine.feasible != theirs.feasible:
+            return (
+                f"the reference is {'feasible' if theirs.feasible else 'infeasible'} and this "
+                f"candidate is {'feasible' if mine.feasible else 'infeasible'}, so they are not "
+                "the same model"
+            )
+        if mine.objective is None or theirs.objective is None:
+            return None
+
+        tolerance = 1e-6 * max(1.0, abs(theirs.objective))
+        if abs(mine.objective - theirs.objective) > tolerance:
+            return (
+                f"solves to {mine.objective:.6g} where the reference solves to "
+                f"{theirs.objective:.6g}; the same case cannot have two optima, so these are "
+                "different models"
+            )
+        return None
 
     def _excerpt(self, completion, verdicts: list[LayerResult]) -> str:
         """Keep a bounded excerpt of the response, but only when something failed.
