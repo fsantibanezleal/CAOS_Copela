@@ -54,8 +54,11 @@ class Sweep:
     #: Turns a narrative into a prompt. Injected so the prompt strategy is a variable under study
     #: rather than a constant baked into the harness.
     build_prompt: Callable[[Case], str]
-    #: Parses a model response into a Problem. Raises on anything it cannot read.
-    parse_response: Callable[[str], Problem]
+    #: Parses a model response into a Problem, given the case it came from. Raises on anything it
+    #: cannot read; a raise becomes a recorded executable-layer failure, never a dropped run.
+    #: The case is passed because a parser often needs it, for instance to check a response against
+    #: the narrative the model was actually given.
+    parse_response: Callable[[str, Case], Problem]
     #: Solves a Problem, for the executable and property layers.
     solve: Callable[[Problem], properties.Solution] | None = None
     repeats: int = 3
@@ -137,7 +140,7 @@ class Sweep:
 
         candidate: Problem | None = None
         try:
-            candidate = self.parse_response(completion.text)
+            candidate = self.parse_response(completion.text, case)
         except Exception as failure:  # noqa: BLE001, any parse failure is the same verdict
             verdicts.append(
                 LayerResult(

@@ -90,7 +90,7 @@ def test_completed_calls_are_not_repeated(ledger_path) -> None:
         budget=Budget(limit_usd=1.0),
         providers={"stub": provider},
         build_prompt=lambda case: f"formalize: {case.narrative}",
-        parse_response=lambda text: __import__("planteo").Problem.from_json(_json.loads(text)),
+        parse_response=lambda text, case: __import__("planteo").Problem.from_json(_json.loads(text)),
         repeats=2,
     )
     cases = [Case("case-001", "optimization", "a narrative")]
