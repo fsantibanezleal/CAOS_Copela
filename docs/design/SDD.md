@@ -153,9 +153,13 @@ R-014  WHILE a sweep holds a ledger exclusively, THE harness SHALL refuse a seco
 
 R-015  WHEN a call fails, THE ledger SHALL record a bounded excerpt of the response.
        Gate: tests/test_ledger.py::test_a_failing_response_is_excerpted_for_diagnosis
+
+R-016  IF nothing reached the faithfulness layers, THEN THE report SHALL state the gap as
+       UNDEFINED, and SHALL NOT report it as zero.
+       Gate: tests/test_report.py::test_a_gap_with_nothing_running_is_undefined_not_zero
 ```
 
-R-013 to R-015 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-016 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -168,13 +172,18 @@ write different keys and nothing collides. R-015 came from the same incident: di
 impossible from a digest, and re-running does not reproduce a failure that inference is not
 deterministic about.
 
+R-016 came from the first completed sweep. A local model failed all ten calls and the report read
+`gap +0.000`, which says "no gap" and means "no measurement". Confusing those two is the exact
+failure this product exists to expose, so making it here would be unforgivable. The gap is now
+undefined when nothing ran, and the text output says so in words.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-015 | all pass, no skips |
+| R-001 to R-016 | all pass, no skips |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

@@ -208,3 +208,41 @@ def test_a_provider_failure_is_recorded_rather_than_raised(ledger_path) -> None:
     records = ledger.records()
     assert len(records) == 1
     assert "stub configured to fail" in records[0].error
+
+
+def test_a_gap_with_nothing_running_is_undefined_not_zero(ledger_path) -> None:
+    """R-016: a model that failed every call has an UNDEFINED gap, never +0.000.
+
+    Measured on a real sweep: a local model failed all ten calls and the report read
+    "gap +0.000", which says "no gap" and means "no measurement". Confusing those two is the exact
+    failure this product exists to expose, so making it here would be unforgivable.
+    """
+    import math
+
+    ledger = Ledger(ledger_path)
+    for repeat in range(4):
+        ledger.append(
+            Record(
+                key=CallKey("c", "stub", "m", repeat),
+                family="optimization",
+                model_version="v",
+                temperature=0.0,
+                seed=1,
+                provider_fingerprint="f",
+                prompt_digest="p",
+                response_digest="r",
+                latency_ms=1.0,
+                input_tokens=1,
+                output_tokens=1,
+                cost_usd=0.0,
+                verdicts=[LayerResult(Layer.EXECUTABLE, Outcome.FAIL, "nope").to_json()],
+            )
+        )
+
+    cell = build(ledger).cells[0]
+    assert cell.ran.passed == 0
+    assert cell.gap_is_defined is False
+    assert math.isnan(cell.gap)
+    assert "UNDEFINED" in cell.describe()
+    assert build(ledger).to_json()["cells"][0]["gap"] is None
+    assert "UNDEFINED" in build(ledger).to_text()
