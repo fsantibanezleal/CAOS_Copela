@@ -168,7 +168,7 @@ def test_unparseable_response_is_a_recorded_failure(ledger_path) -> None:
     provider = StubProvider(default="I think the answer is about 900 dollars.")
     ledger = Ledger(ledger_path)
 
-    def parse(text: str):
+    def parse(text: str, case):
         from planteo import Problem
 
         return Problem.from_json(json.loads(text))
@@ -201,7 +201,7 @@ def test_a_provider_failure_is_recorded_rather_than_raised(ledger_path) -> None:
         budget=Budget(limit_usd=1.0),
         providers={"stub": provider},
         build_prompt=lambda case: "formalize this",
-        parse_response=lambda text: None,  # type: ignore[return-value]
+        parse_response=lambda text, case: None,  # type: ignore[return-value]
         repeats=1,
     )
     sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])

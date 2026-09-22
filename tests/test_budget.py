@@ -26,7 +26,7 @@ def test_sweep_stops_before_the_budget(ledger_path) -> None:
         budget=budget,
         providers={"stub": provider},
         build_prompt=lambda case: "formalize this narrative " * 40,
-        parse_response=lambda text: None,  # type: ignore[return-value]
+        parse_response=lambda text, case: None,  # type: ignore[return-value]
         repeats=50,
         expected_output_tokens=1200,
     )
