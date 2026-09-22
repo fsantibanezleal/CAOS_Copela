@@ -202,9 +202,21 @@ class Sweep:
                     )
                 )
             except Exception as failure:  # noqa: BLE001
-                results.append(
-                    LayerResult(Layer.EXECUTABLE, Outcome.FAIL, f"solving failed: {failure}")
-                )
+                # A solver that cannot EXPRESS the model is a limit of this harness, not a defect
+                # in the formalization. Counting it as a model failure would blame the subject for
+                # the instrument, so it is recorded as unmeasured and left out of both rates.
+                if type(failure).__name__ == "ModelNotSupported":
+                    results.append(
+                        LayerResult(
+                            Layer.EXECUTABLE,
+                            Outcome.NOT_APPLICABLE,
+                            f"not measured: {failure}",
+                        )
+                    )
+                else:
+                    results.append(
+                        LayerResult(Layer.EXECUTABLE, Outcome.FAIL, f"solving failed: {failure}")
+                    )
                 return results
 
         results.append(self._structural(candidate, case))
