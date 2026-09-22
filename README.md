@@ -1,0 +1,144 @@
+# copela
+
+[![PyPI](https://img.shields.io/pypi/v/copela.svg)](https://pypi.org/project/copela/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Run narrative-to-formal translation across many language models, and score the result with oracles
+that are **not** language models.
+
+The name is the cupel used in fire assay: the vessel that separates the metal from the lead. That is
+the job here, separating a formalization that is faithful from one that merely runs.
+
+## The number this produces
+
+```
+gap report
+============================================================
+
+  anthropic/claude-sonnet-5 [optimization]  ran 0.940 [0.832, 0.981] n=50  faithful 0.720 [0.584, 0.826] n=50  gap +0.220
+```
+
+**ran** is what the field reports. **faithful** is what was asked for. The gap between them is the
+output, and no source found reports it across target families.
+
+That gap is not hypothetical. Where it has been measured carefully, in natural-language to Lean
+formalization, it runs [3.0 to 29.0 percentage points](https://arxiv.org/abs/2606.31002), and the
+strongest system measured had the largest gap: 89.5% compiling, 60.5% faithful.
+
+## Four layers, never merged
+
+| Layer | Asks | Strength |
+|---|---|---|
+| **executable** | did it run, solve, compile | necessary, weak, the layer the field over-reports |
+| **structural** | is it the same model as the reference | strong where it applies |
+| **property** | do the invariants of this class hold | strong, catches what structure misses |
+| **judge** | what would a model say | a labelled screening aggregate, never truth |
+
+There is deliberately **no combined score**, and a test fails if anyone adds one. A single number
+lets a high "it ran" rate conceal a low "it was right" rate, which is the distance this exists to
+show.
+
+The judge layer is reported because the literature reports it and comparability matters. It carries
+a label on every record saying it is not an oracle, because the study that calibrated a two-judge
+consensus against human majority states exactly that.
+
+## The property layer
+
+Metamorphic relations: instead of checking an exact output, check how the output **must** change
+when the input changes in a controlled way.
+
+| Relation | Guarantee |
+|---|---|
+| scale the objective by `k > 0` | the argmin cannot move |
+| add a redundant constraint | the feasible set cannot change |
+| tighten a constraint | the optimum cannot improve |
+
+The standard objection to metamorphic testing is that the relations must be authored per problem
+class and so do not generalise to arbitrary programs. That is the design here: the target families
+are narrow typed classes, so the relations are written once per class.
+
+A candidate that solves and then fails one of these is wrong in a way no solver would have reported.
+
+## Install
+
+```bash
+pip install copela                    # the harness
+pip install "copela[solvers]"         # plus Pyomo and HiGHS
+pip install "copela[all]"             # plus the provider SDKs
+```
+
+## Use
+
+```python
+from copela import Budget, Case, Ledger, Sweep, Target, build
+from copela.providers import get
+from copela.solvers.highs import make_solver
+
+sweep = Sweep(
+    ledger=Ledger("runs.jsonl"),
+    budget=Budget(limit_usd=5.00, max_consecutive_failures=10),
+    providers={"anthropic": get("anthropic"), "ollama": get("ollama")},
+    build_prompt=my_prompt,        # the prompt strategy is what a study varies
+    parse_response=my_parser,
+    solve=make_solver(),
+    repeats=5,
+)
+
+sweep.run(cases, [Target("anthropic", "claude-sonnet-5"),
+                  Target("ollama", "qwen3:8b")])
+
+print(build(Ledger("runs.jsonl")).to_text())
+```
+
+From the shell:
+
+```bash
+copela models                      # what each provider serves, and what it costs
+copela solve problem.json          # solve one formalization, no model involved
+copela report runs.jsonl           # the gap
+```
+
+## Why many models, not one
+
+Because a benchmark of AI-assisted modelling and simulation reports that
+[no single model dominates across engine types](https://arxiv.org/abs/2605.28994), with
+task-specific tradeoffs between speed and accuracy. A ranking claimed from one model contradicts a
+published result, so the provider seam is a requirement rather than tidiness: Anthropic, Groq and
+local models through Ollama, behind one interface, with no vendor name anywhere outside
+`copela/providers/`. A test enforces that.
+
+## What reproducibility means here
+
+Temperature zero does not make hosted inference deterministic. The dominant cause is the batch-size
+dependence of reduction kernels rather than floating-point non-associativity, and bitwise
+determinism costs a third to two thirds of throughput and cannot be bought over a hosted API.
+
+So the harness pins what it can (model, version, temperature, seed, provider fingerprint), records
+`n` repeats, and reports a **rate with a Wilson interval**. It never presents a single run as the
+result, and 5 of 5 is not reported as certainly 1.0.
+
+## The ledger
+
+One append-only JSONL record per call, carrying its full provenance. A record is never edited,
+because a ledger that can be rewritten is not evidence. It is also the resume mechanism: a sweep
+reads it and skips the calls already done.
+
+## Cost
+
+Every sweep declares a budget and a kill criterion before it runs, and the guard refuses the call
+that **would** exceed the ceiling rather than noticing afterwards.
+
+## Documentation
+
+The wiki is in [`docs/`](docs/). The design document, written before the code, is
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its twelve requirements names the test that
+verifies it.
+
+## Related
+
+[`planteo`](https://github.com/fsantibanezleal/CAOS_Planteo) is the representation this consumes: a
+typed problem with dimensions on every quantity and provenance on every element.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
