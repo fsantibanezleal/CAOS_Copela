@@ -20,25 +20,44 @@ from .base import Completion, Pricing, Provider, ProviderError
 class AnthropicProvider(Provider):
     """Claude models through the official SDK.
 
-    Pricing below was set 2026-09-22 and is not re-verified by the code. Check it before quoting a
-    cost from a sweep.
+    Two things here are easy to get wrong and were wrong in the first version.
+
+    **Model ids carry no date suffix.** `claude-sonnet-5`, not `claude-sonnet-5-20250101`. A dated
+    variant recalled from older material is not a real id and fails at the API.
+
+    **These models do not accept a temperature.** The parameter was removed, and the installed SDK
+    does not even define it, so passing one is a `TypeError` rather than a polite rejection. The
+    depth lever is `output_config.effort`. That matters beyond the call site: the run ledger records
+    temperature as pinned provenance, and recording `0.0` for a provider that has no such control
+    would be recording a number nobody set.
+
+    Pricing below is configuration, set 2026-09-22 from the current published table. It moves.
+    Re-check it before quoting a cost from a sweep.
     """
 
     name = "anthropic"
 
     _MODELS = {
-        "claude-opus-5": Pricing(15.0, 75.0),
-        "claude-sonnet-5": Pricing(3.0, 15.0),
-        "claude-haiku-4-5-20251001": Pricing(1.0, 5.0),
+        "claude-opus-5": Pricing(5.0, 25.0),
+        "claude-sonnet-5": Pricing(2.0, 10.0),
+        "claude-haiku-4-5": Pricing(1.0, 5.0),
     }
 
-    def __init__(self, api_key: str | None = None) -> None:
+    #: Effort replaces temperature as the depth control, but NOT on every model: the current
+    #: frontier models take it and Haiku 4.5 returns a 400 for it. So it is a per-model capability
+    #: rather than a uniform parameter, and sending it everywhere makes the cheapest lane fail.
+    _SUPPORTS_EFFORT = frozenset({"claude-opus-5", "claude-sonnet-5"})
+
+    _DEFAULT_EFFORT = "high"
+
+    def __init__(self, api_key: str | None = None, effort: str | None = None) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         if not self._api_key:
             raise ProviderError(
                 "no Anthropic API key: pass one, or set ANTHROPIC_API_KEY. "
                 "The key belongs in the environment, never in a committed file"
             )
+        self._effort = effort or self._DEFAULT_EFFORT
         self._client = None
 
     def _get_client(self):
@@ -62,17 +81,33 @@ class AnthropicProvider(Provider):
         max_tokens: int = 4096,
     ) -> Completion:
         client = self._get_client()
+
+        # No temperature and no seed: neither exists on these models. Effort is the control that
+        # does, where the model accepts it, so it is what gets pinned and recorded.
+        uses_effort = model_id in self._SUPPORTS_EFFORT
+        request: dict[str, object] = {
+            "model": model_id,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if uses_effort:
+            request["output_config"] = {"effort": self._effort}
+
         started = time.perf_counter()
         try:
-            message = client.messages.create(
-                model=model_id,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            message = client.messages.create(**request)  # type: ignore[arg-type]
         except Exception as error:  # the SDK's exception tree is not ours to depend on
             raise ProviderError(f"anthropic call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
+
+        if getattr(message, "stop_reason", "") == "refusal":
+            # A refusal is an HTTP 200 with no usable content. Treating it as an empty response
+            # would record a formalization failure where the model declined to try.
+            details = getattr(message, "stop_details", None)
+            category = getattr(details, "category", None) if details else None
+            raise ProviderError(
+                f"anthropic declined the request (category {category or 'unspecified'})"
+            )
 
         text = "".join(
             block.text for block in message.content if getattr(block, "type", "") == "text"
@@ -81,9 +116,14 @@ class AnthropicProvider(Provider):
             text=text,
             model_id=model_id,
             model_version=getattr(message, "model", model_id),
-            # This API exposes no serving fingerprint. Recording the absence explicitly is more
-            # honest than recording an empty string that reads like a missing field.
-            fingerprint="not-exposed",
+            # No serving fingerprint is exposed, and temperature and seed do not exist on this
+            # provider. The fingerprint records the control that DOES apply, so a ledger row says
+            # what was actually pinned instead of implying a temperature nobody set.
+            fingerprint=(
+                f"anthropic#effort={self._effort}#no-temperature"
+                if uses_effort
+                else "anthropic#no-effort#no-temperature"
+            ),
             input_tokens=message.usage.input_tokens,
             output_tokens=message.usage.output_tokens,
             latency_ms=latency_ms,
