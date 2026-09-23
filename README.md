@@ -132,11 +132,15 @@ outside `copela/providers/`. A test enforces that.
 | `groq` | `GROQ_API_KEY` | temperature, seed, and the system fingerprint the server returns |
 | `zai` | `ZAI_API_KEY`, and `ZAI_BASE_URL` for a coding-plan key | effort from GLM-5.2 up, greedy decoding for temperature 0, no seed |
 | `deepseek` | `DEEPSEEK_API_KEY` | effort; temperature has no effect in thinking mode, no seed |
-| `ollama` | none (`OLLAMA_HOST`) | temperature, seed, and whether reasoning was on |
+| `ollama` | none (`OLLAMA_HOST`) | temperature, seed, the reasoning switch where the model has one, the context it was given, and the digest of the weights |
 
 Each records what it actually pinned, and the model the server says it ran, which is not always the
 one requested. A reasoning model that spends its whole output cap on reasoning is recorded as that
 truncation, with the length of the reasoning, never as an empty answer.
+
+The local lane asks for a context that holds the prompt and the whole cap. Left to itself the server
+picks one from the GPU's memory, 4096 tokens on an 8 GB card, and when a generation outgrows it the
+server does not stop: it shifts the context and the model writes on without the start of its prompt.
 
 ## What reproducibility means here
 
@@ -168,7 +172,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its twenty-five requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its twenty-eight requirements names the test
 that verifies it.
 
 ## Related
