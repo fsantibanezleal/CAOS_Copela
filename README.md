@@ -156,8 +156,9 @@ single run as the result, and does not report 5 of 5 as certainly 1.0.
 
 ## The ledger
 
-One append-only JSONL record per call, carrying its full provenance. A record is never edited,
-because a ledger that can be rewritten is not evidence. It is also the resume mechanism: a sweep
+One append-only JSONL record per call, carrying its full provenance, including the copela version
+that scored it and the output cap it ran at. A record is never edited, because a ledger that can be
+rewritten is not evidence. It is also the resume mechanism: a sweep
 reads it and skips the calls already done.
 
 ## Cost
@@ -172,7 +173,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its thirty-two requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its thirty-three requirements names the test
 that verifies it.
 
 ## Related
