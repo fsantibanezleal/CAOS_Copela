@@ -6,7 +6,9 @@ this module is what it refuses to do:
 - it never drops a run, including one whose response did not parse, because a discarded failure is a
   silently inflated success rate
 - it never repeats a completed call, because a long sweep that lost its work is a cost already paid
-- it never spends past the budget, because the guard runs before the call
+- it never spends past the budget, because the guard runs before the call and projects the most the
+  call can bill
+- it never calls a model it has no price for, because the guard would count that call as free
 """
 
 from __future__ import annotations
@@ -16,10 +18,10 @@ from dataclasses import dataclass
 
 from planteo import Problem, Sense, validate
 
-from .budget import Budget, BudgetExceeded, estimate
+from .budget import Budget, BudgetExceeded, UnpricedModel, estimate
 from .ledger import CallKey, Ledger, Record, digest
 from .oracles import properties
-from .providers import Provider, ProviderError
+from .providers import Pricing, Provider, ProviderError
 from .verdicts import Layer, LayerResult, Outcome
 
 
@@ -64,16 +66,19 @@ class Sweep:
     repeats: int = 3
     temperature: float = 0.0
     seed: int | None = 20260922
-    expected_output_tokens: int = 1200
     #: How much of a failing response to keep in the ledger, in characters.
     excerpt_chars: int = 2000
     #: Hard cap per call. A formalization document runs to a few thousand tokens, and a cap set
     #: for chat-sized replies truncates it into a failure that looks like the model could not do
-    #: the task.
+    #: the task. It is also what the guard projects each call at, since no call can bill more.
     max_tokens: int = 8192
 
     def run(self, cases: Sequence[Case], targets: Sequence[Target]) -> int:
-        """Run the sweep. Returns the number of calls made in this invocation."""
+        """Run the sweep. Returns the number of calls made in this invocation.
+
+        Raises ``UnpricedModel`` before the first call if any target has no price.
+        """
+        prices = self._price(targets)
         done = self.ledger.completed()
         made = 0
 
@@ -81,7 +86,7 @@ class Sweep:
             prompt = self.build_prompt(case)
             for target in targets:
                 provider = self.providers[target.provider_name]
-                pricing = provider.models().get(target.model_id)
+                pricing = prices[target]
                 for repeat in range(self.repeats):
                     key = CallKey(
                         case_id=case.case_id,
@@ -92,15 +97,11 @@ class Sweep:
                     if key.as_tuple() in done:
                         continue
 
-                    projected = (
-                        estimate(
-                            prompt,
-                            self.expected_output_tokens,
-                            pricing.input_per_mtok,
-                            pricing.output_per_mtok,
-                        )
-                        if pricing
-                        else 0.0
+                    projected = estimate(
+                        prompt,
+                        self.max_tokens,
+                        pricing.input_per_mtok,
+                        pricing.output_per_mtok,
                     )
                     try:
                         self.budget.check(projected)
@@ -110,6 +111,29 @@ class Sweep:
                     self._run_one(case, target, provider, prompt, key)
                     made += 1
         return made
+
+    def _price(self, targets: Sequence[Target]) -> dict[Target, Pricing]:
+        """Every target's price, or a refusal before anything is spent.
+
+        An earlier version projected an unpriced model at zero, and the provider then charged it at
+        zero, so a sweep of a model missing from a price table spent real money against a budget
+        that never moved. A local model is priced too, at nothing, which is a price; a model the
+        local server has not pulled is refused here rather than failing every call.
+        """
+        prices: dict[Target, Pricing] = {}
+        for target in targets:
+            models = self.providers[target.provider_name].models()
+            pricing = models.get(target.model_id)
+            if pricing is None:
+                listed = ", ".join(sorted(models)) or "nothing"
+                raise UnpricedModel(
+                    f"{target.provider_name!r} has no price for {target.model_id!r}, so the budget "
+                    "guard would count its calls as free and could not stop the sweep. "
+                    f"Priced by this provider: {listed}. For a hosted model, add its published "
+                    "price to the provider's table; for a local one, pull it first"
+                )
+            prices[target] = pricing
+        return prices
 
     def _run_one(
         self,

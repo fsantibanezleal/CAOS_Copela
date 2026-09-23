@@ -16,7 +16,7 @@ The headline is the subtraction: how often the artifact ran, minus how often it 
 
 from __future__ import annotations
 
-from .budget import Budget, BudgetExceeded, estimate
+from .budget import Budget, BudgetExceeded, UnpricedModel, estimate
 from .ledger import CallKey, Ledger, LedgerError, Record
 from .providers import Provider, ProviderError, StubProvider
 from .report import Cell, Report, build
@@ -30,8 +30,8 @@ from .verdicts import (
     Rate,
 )
 
-__version__ = "0.2.3"
-__display_version__ = "0.02.003"
+__version__ = "0.3.0"
+__display_version__ = "0.03.000"
 
 __all__ = [
     "JUDGE_LABEL",
@@ -54,6 +54,7 @@ __all__ = [
     "StubProvider",
     "Sweep",
     "Target",
+    "UnpricedModel",
     "__display_version__",
     "__version__",
     "build",

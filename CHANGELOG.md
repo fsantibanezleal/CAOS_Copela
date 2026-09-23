@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.03.000] - 2026-09-23
+
+### Added
+
+- **Two providers, `zai` (GLM models) and `deepseek`**, over their OpenAI-shaped endpoints in plain
+  HTTP, with no SDK. Each writes its request out explicitly and says in its fingerprint which
+  controls it exercised: Z.AI sends greedy decoding for temperature 0 and an effort only to the
+  models that take one; DeepSeek sends its effort and no temperature, which its thinking mode
+  ignores. Neither exposes a seed, and neither claims one. An HTTP error keeps its body, because the
+  body names the cause. `ZAI_BASE_URL` selects the coding-plan endpoint, the only one a GLM Coding
+  Plan key works on.
+- The Z.AI table holds what is both priced and callable, checked 2026-09-23. The pricing page prices
+  models that `/models` does not list, and one of them, GLM-4.5-Flash, answered calls free with no
+  balance at all. `/models` lists GLM-5-Turbo, which nothing prices, so it is left out.
+- `UnpricedModel`, exported.
+
+### Changed
+
+- **The budget guard projects a call at its output cap (R-025)**, not at 1200 tokens. Reasoning
+  models bill their reasoning as output, and the first two measured spent 5206 and 7931 tokens on
+  one case, so the guard could pass a call it should have refused. `Sweep.expected_output_tokens`
+  is removed, since any value below the cap re-opens the overrun, and the second argument of
+  `estimate` is renamed `output_tokens`. A sweep of reasoning models now stops earlier than its
+  typical spend suggests, which is the intended direction.
+- **A sweep refuses a model it has no price for (R-024)**, before its first call, naming the models
+  the provider does price. The guard used to project such a model at zero and the provider charged
+  it at zero, so the budget never moved while the calls were billed. A local model not yet pulled is
+  refused the same way instead of failing every call.
+- `copela models` prints "no per-token price" for a free model, not "(local)", since a free hosted
+  model now exists.
+
+### Fixed
+
+- **A reasoning-only reply on the Groq lane was recorded as empty (R-022).** gpt-oss returns its
+  reasoning in `message.reasoning`, and a reply that spent the cap on it came back as an empty
+  string. Every lane that can reason (Ollama, Groq, Z.AI, DeepSeek) now returns one sentence for
+  this, from one function, because a report classifies truncations by it. The Ollama lane gains the
+  finish reason it lacked.
+- The model recorded is the one the server reports running (R-023). The Z.AI coding endpoint
+  answered a request for GLM-5.2 with GLM-5.3.
+- The README said the design document had eighteen requirements. It had twenty-one, and now has
+  twenty-five.
+
 ## [0.02.003] - 2026-09-23
 
 ### Fixed

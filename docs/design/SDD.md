@@ -64,8 +64,15 @@ have reported.
 
 ## 5. The provider seam
 
-One interface, several backends: Anthropic, Groq, and local open-weight models through Ollama. No
-provider name appears anywhere outside `providers/`.
+One interface, several backends: Anthropic and Groq through their SDKs; Z.AI and DeepSeek over
+their OpenAI-shaped endpoints in plain HTTP; and local open-weight models through Ollama. No provider
+name appears anywhere outside `providers/`.
+
+Two behaviours are the seam's rather than any one vendor's, because they decide what a ledger row
+means. A reasoning model that spends its output cap on reasoning and answers nothing is reported as
+that truncation, with the length of the reasoning, never as an empty response (R-022). And the model
+recorded is the one the server says it ran, which is not always the one requested: an endpoint
+served GLM-5.3 to a request for GLM-5.2 (R-023).
 
 This is a requirement rather than tidiness. The simulation-modelling benchmark reports that **no
 single model dominates across engine types**, so a result claimed from one model contradicts a
@@ -94,6 +101,10 @@ answer. Anything that claims exact reproduction of a hosted call is wrong.
 Every sweep declares a budget and a kill criterion before it runs. The ladder is cheap-first: local
 models, then small hosted models, then frontier models on the reduced set. The ledger carries the
 running cost and the sweep stops at the budget rather than after it.
+
+The guard can only bound what it can price, and only as tightly as its projection. So a target
+with no price is refused before the first call (R-024), and each call is projected at the most it
+can bill, its output cap, rather than at a typical length (R-025).
 
 ## 9. Requirements
 
@@ -177,9 +188,25 @@ R-020  WHEN a candidate states the reference's objective in the opposite sense w
 R-021  IF a candidate's executable layer did not pass, THEN THE verdict SHALL NOT be faithful, whatever
        the strong layers report.
        Gate: tests/test_report.py::test_a_candidate_that_never_ran_cannot_be_faithful
+
+R-022  IF a model returns reasoning and no answer, THEN THE provider SHALL return a text stating that
+       truncation and the length of the reasoning, and SHALL NOT return an empty response.
+       Gate: tests/test_providers.py::test_reasoning_with_no_answer_is_a_truncation_on_every_lane
+
+R-023  WHEN a server reports the model it ran, THE completion SHALL carry that name as the model
+       version, whatever name was requested.
+       Gate: tests/test_chat_providers.py::test_the_served_model_name_is_kept_when_it_differs_from_the_request
+
+R-024  IF a target's provider has no price for its model, THEN THE sweep SHALL refuse to start, before
+       any call is made.
+       Gate: tests/test_budget.py::test_an_unpriced_model_is_refused_before_any_call
+
+R-025  WHILE a sweep is running, THE budget guard SHALL project each call at its output cap, and SHALL
+       NOT project it at a typical output length.
+       Gate: tests/test_budget.py::test_the_projection_bounds_a_call_that_fills_its_cap
 ```
 
-R-013 to R-021 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-025 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -221,13 +248,24 @@ reading. The calls that did not fail keep no document, so whether any of them wo
 cannot be re-checked; one would have had to optimise in the opposite sense and still land exactly on
 the reference's value.
 
+R-022 to R-025 came from adding the first providers outside Anthropic, and all four from smoke runs
+rather than from reading. R-022 generalises what the local lane already did after qwen3.5:4b spent
+every call on reasoning and answered nothing: the hosted reasoning models bill reasoning as output
+under the same cap, so the same truncation had to be reported the same way. R-023 came from the Z.AI
+coding endpoint answering a request for GLM-5.2 with GLM-5.3. R-024 and R-025 are one finding about
+the guard, which had been correct only for the models it was written against. It projected a call at
+1200 output tokens, and the first two reasoning models measured spent 5206 and 7931 on one case, so
+it could pass a call it should have refused. And a model missing from a price table was projected at
+zero and then charged at zero, so the budget never moved while the calls were billed; Z.AI's own
+catalogue lists a model its pricing page does not price, so that was one typo away.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-021 | all pass, no skips (0.02.003) |
+| R-001 to R-025 | all pass, no skips (0.03.000) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
