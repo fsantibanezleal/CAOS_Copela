@@ -173,9 +173,13 @@ R-019  IF the configured solver cannot express a candidate, THEN THE report SHAL
 R-020  WHEN a candidate states the reference's objective in the opposite sense with its expression
        negated, THE structural layer SHALL NOT report FAIL.
        Gate: tests/test_sweep.py::test_a_sense_flipped_rewrite_is_not_refuted
+
+R-021  IF a candidate's executable layer did not pass, THEN THE verdict SHALL NOT be faithful, whatever
+       the strong layers report.
+       Gate: tests/test_report.py::test_a_candidate_that_never_ran_cannot_be_faithful
 ```
 
-R-013 to R-020 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-021 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -223,7 +227,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-020 | all pass, no skips (0.02.001) |
+| R-001 to R-021 | all pass, no skips (0.02.003) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
