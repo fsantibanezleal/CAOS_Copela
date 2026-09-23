@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.02.001] - 2026-09-23
+
+### Fixed
+
+- **A sense-flipped rewrite is no longer refuted (R-020).** The structural layer compared the two
+  optimal values raw, so a candidate maximising the negative of the cost, where the reference
+  minimises the cost, solved to -z against z and was reported as a different optimum: a style
+  rewrite refuted as a wrong model. Both optima are now read in the minimising sense before they
+  are compared. A candidate optimising the same expression the wrong way is still refuted, unless
+  its optimum is exactly the negative of the reference's, which reads as UNDECIDED and never as
+  PASS. Neither refutation in the published Enunciado ledger changes: both compare values of the
+  same sign. The calls that did not fail keep no document, so whether any of them would now be
+  refuted cannot be re-checked; it would take a candidate optimising in the opposite sense that
+  still lands exactly on the reference's value.
+
+### Changed
+
+- The four-layers page states the published measurement as it is: two refutations, one per model,
+  a gap of +0.050 for each, and PASS on none of the sixteen candidates that ran. It had described
+  the two refutations as one model's and its gap as +0.100.
+
 ## [0.02.000] - 2026-09-22
 
 The release that makes the published measurement reproducible. 0.01.000 carried a structural layer
