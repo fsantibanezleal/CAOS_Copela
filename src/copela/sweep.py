@@ -404,6 +404,9 @@ class Sweep:
         verdicts: list[LayerResult],
         error: str,
     ) -> None:
+        # Imported here, not at module level: the package imports this module while initialising.
+        from . import __version__
+
         self.ledger.append(
             Record(
                 key=key,
@@ -421,6 +424,8 @@ class Sweep:
                 verdicts=[v.to_json() for v in verdicts],
                 error=error,
                 response_excerpt=self._excerpt(completion, verdicts),
+                harness=f"copela {__version__}",
+                max_tokens=self.max_tokens,
             )
         )
 
