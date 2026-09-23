@@ -178,3 +178,34 @@ def test_a_sense_flipped_rewrite_is_not_refuted(ledger_path) -> None:
     assert structural is not None
     assert structural["outcome"] == Outcome.UNDECIDED.value, structural
     assert structural["outcome"] != Outcome.FAIL.value
+
+
+def test_two_infeasible_models_are_described_as_infeasible_not_as_one_optimum(ledger_path) -> None:
+    """R-029: agreeing that no feasible point exists is UNDECIDED, and the record says what agreed.
+
+    The message used to read "both solve to the same optimum" for a pair with no optimum at all,
+    and it was written into every ledger record of Enunciado's contradictory case.
+    """
+    from planteo import Comparator, Compare, Constant, Dimension, Ref
+
+    from tests.conftest import make_blend
+
+    TONNE = Dimension.of("t", mass=1)
+    blend = make_blend()
+
+    def impossible(cap: float):
+        return dataclasses.replace(
+            blend,
+            relations=blend.relations
+            + (
+                Compare(Ref("x_a"), Comparator.LE, Constant(cap, TONNE), name="a_tiny"),
+                Compare(Ref("x_b"), Comparator.LE, Constant(cap, TONNE), name="b_tiny"),
+            ),
+        )
+
+    # Two different contradictions of the same demand: canonically unequal, both infeasible.
+    layers = _run(ledger_path, impossible(1.0), impossible(2.0))
+    structural = layers[Layer.STRUCTURAL.value]
+    assert structural["outcome"] == Outcome.UNDECIDED.value, structural
+    assert "both are infeasible" in structural["detail"], structural
+    assert "optimum" not in structural["detail"], structural
