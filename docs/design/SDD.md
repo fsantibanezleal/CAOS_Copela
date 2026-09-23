@@ -169,9 +169,13 @@ R-018  WHEN a candidate and its reference solve to the same optimum but differ i
 R-019  IF the configured solver cannot express a candidate, THEN THE report SHALL exclude that call
        from both rates and count it as unmeasured.
        Gate: tests/test_report.py::test_an_unmeasurable_run_leaves_the_rates_rather_than_counting_against_the_model
+
+R-020  WHEN a candidate states the reference's objective in the opposite sense with its expression
+       negated, THE structural layer SHALL NOT report FAIL.
+       Gate: tests/test_sweep.py::test_a_sense_flipped_rewrite_is_not_refuted
 ```
 
-R-013 to R-019 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-020 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -201,13 +205,25 @@ IS conclusive. The asymmetry is deliberate and is the honest part: a matching op
 a verdict to PASS, because compensating errors reach the right number, which is the failure the
 anchor survey documents.
 
+R-020 came from documenting R-017 against the code. The comparison took the two optimal values raw,
+so a candidate that maximises the negative of the cost where the reference minimises the cost, the
+same model written the other way round, solves to -z against z and was refuted as a different
+optimum. That is a false FAIL on a style rewrite, the exact error the layer's asymmetry exists to
+avoid. Both values are now read in the minimising sense before they are compared. A candidate that
+optimises the same expression the wrong way is still refuted, unless its optimum is exactly the
+negative of the reference's, in which case it reads as UNDECIDED, never as PASS. Neither refutation
+in the published ledger changes: both compare values of the same sign, which differ under either
+reading. The calls that did not fail keep no document, so whether any of them would now be refuted
+cannot be re-checked; one would have had to optimise in the opposite sense and still land exactly on
+the reference's value.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-019 | all pass, no skips |
+| R-001 to R-020 | all pass, no skips (0.02.001) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
