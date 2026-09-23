@@ -109,9 +109,17 @@ class CandidateVerdict:
         """Layers 2 and 3 together, and only when they actually decided.
 
         Structural ``UNDECIDED`` does not block: canonical inequality proves nothing, so the
-        property layer carries the decision in that case. A candidate is called faithful when
-        nothing that could decide against it did, and at least one strong layer decided for it.
+        property layer carries the decision in that case. A candidate is called faithful when it
+        ran, nothing that could decide against it did, and at least one strong layer decided for
+        it.
+
+        The first clause was missing (R-021). The sweep never produces a structural or property
+        verdict for a candidate that did not run, so no recorded rate was affected, but the
+        property is public API and a verdict built by hand could be "faithful" without running,
+        which the report's own comment rules out.
         """
+        if not self.ran:
+            return False
         structural = self.of(Layer.STRUCTURAL)
         prop = self.of(Layer.PROPERTY)
         for result in (structural, prop):
