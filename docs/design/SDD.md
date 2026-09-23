@@ -220,9 +220,20 @@ R-029  WHEN a candidate and its reference are both infeasible and differ in cano
        structural layer SHALL report UNDECIDED, and its detail SHALL say both are infeasible rather
        than name an optimum.
        Gate: tests/test_sweep.py::test_two_infeasible_models_are_described_as_infeasible_not_as_one_optimum
+
+R-030  IF a candidate with an objective is unbounded, THEN THE executable layer SHALL NOT pass it.
+       Gate: tests/test_sweep.py::test_an_unbounded_candidate_does_not_run
+
+R-031  WHEN a candidate is unbounded and its reference has an optimum, or the reverse, THE structural
+       layer SHALL report FAIL.
+       Gate: tests/test_sweep.py::test_an_unbounded_candidate_is_refuted_against_a_reference_with_an_optimum
+
+R-032  IF a candidate is unbounded, THEN THE property layer SHALL report not-applicable, and SHALL NOT
+       report FAIL.
+       Gate: tests/test_sweep.py::test_an_unbounded_candidate_leaves_the_relations_unevaluated
 ```
 
-R-013 to R-029 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-032 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -293,13 +304,23 @@ R-029 came from classifying the first sweeps outside Anthropic. On Enunciado's c
 opt-019, both Claude candidates were infeasible, like the reference, and the structural detail read
 "both solve to the same optimum" for a pair with no optimum at all.
 
+R-030 to R-032 came from checking the first property-layer refutation the ledger had ever recorded,
+before publishing it as one. It was not one. deepseek-r1:8b's candidate for opt-006 was unbounded:
+the solver wrapper reports that as a feasible point with no objective value, so the executable layer
+passed it, the structural layer fell through to "both solve to the same optimum" against a
+reference that solves to 16.667, and the objective-scaling relation, finding no argmin to compare,
+reported FAIL. Three layers were wrong about one record, each in a way that looked like a finding.
+Running now means reaching an optimum, or a feasible point for a model with no objective; an
+unbounded candidate against a reference with an optimum is refuted, which is conclusive; and the
+relations report that they had nothing to compare.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-029 | all pass, no skips (0.03.002) |
+| R-001 to R-032 | all pass, no skips (0.03.003) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
