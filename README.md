@@ -172,7 +172,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its twenty-nine requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its thirty-two requirements names the test
 that verifies it.
 
 ## Related

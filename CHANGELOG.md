@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.03.003] - 2026-09-23
+
+### Fixed
+
+- **An unbounded candidate passed the executable layer (R-030).** The solver wrapper reports an
+  unbounded model as feasible with no objective value, and the executable layer passed anything
+  feasible. Running now means reaching an optimum, or a feasible point for a model with no
+  objective, so an unbounded model is a failure to run, recorded as `unbounded`.
+- **An unbounded candidate was described as agreeing on an optimum (R-031).** With no objective
+  value on one side the comparison fell through to "both solve to the same optimum". A candidate
+  that is unbounded where the reference has an optimum, or the reverse, is now refuted: the same case
+  cannot have an optimum and none. Two unbounded models read as UNDECIDED, "both are unbounded",
+  and two feasibility-only models as "both are feasible with no objective to compare".
+- **The property layer reported FAIL on an unbounded candidate (R-032).** The objective-scaling
+  relation found no argmin to compare and called that a failure. The layer now reports
+  not-applicable, as it does for an infeasible candidate.
+
+Found by checking deepseek-r1:8b's opt-006 record, which read as the first metamorphic refutation
+Enunciado's ledger had recorded, before publishing it as one.
+
 ## [0.03.002] - 2026-09-23
 
 ### Fixed
