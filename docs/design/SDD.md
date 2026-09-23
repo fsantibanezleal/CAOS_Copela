@@ -82,7 +82,8 @@ published finding.
 
 Every call appends one JSONL record carrying: case id, family, provider, model id, model version,
 temperature, seed, provider fingerprint, prompt digest, repeat index, latency, token counts,
-estimated cost, the raw response digest, and every layer's verdict.
+estimated cost, the raw response digest, every layer's verdict, and, from schema 1.1, the copela
+version that scored it and the output cap it ran at (R-033).
 
 Append-only. A run is never edited, because a ledger that can be rewritten is not evidence.
 
@@ -231,9 +232,13 @@ R-031  WHEN a candidate is unbounded and its reference has an optimum, or the re
 R-032  IF a candidate is unbounded, THEN THE property layer SHALL report not-applicable, and SHALL NOT
        report FAIL.
        Gate: tests/test_sweep.py::test_an_unbounded_candidate_leaves_the_relations_unevaluated
+
+R-033  WHEN a sweep records a call, THE record SHALL carry the copela version that scored it and the
+       output cap the call ran at.
+       Gate: tests/test_ledger.py::test_a_sweep_records_its_harness_and_its_cap
 ```
 
-R-013 to R-032 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -314,13 +319,19 @@ Running now means reaching an optimum, or a feasible point for a model with no o
 unbounded candidate against a reference with an optimum is refuted, which is conclusive; and the
 relations report that they had nothing to compare.
 
+R-033 came from the same day. Enunciado's one ledger held records scored by copela 0.2.0, 0.3.0 and
+0.3.2, which judge an unbounded candidate differently after 0.3.3, and nothing in a record said which
+one had scored it; and its report had to assume the output cap, because a record could not state
+its own. Records now carry both. A record written before schema 1.1 loads with both empty, which a
+reader must take as unknown.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-032 | all pass, no skips (0.03.003) |
+| R-001 to R-033 | all pass, no skips (0.04.000) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

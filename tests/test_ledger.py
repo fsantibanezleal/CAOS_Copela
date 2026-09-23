@@ -219,3 +219,39 @@ def test_a_successful_response_is_not_excerpted(ledger_path, blend_json) -> None
     )
     sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
     assert ledger.records()[0].response_excerpt == ""
+
+
+def test_a_sweep_records_its_harness_and_its_cap(ledger_path) -> None:
+    """R-033: each record says which copela scored it and the output cap it ran at.
+
+    One ledger held records from three copela versions, which judge an unbounded candidate
+    differently, and nothing in a record told them apart; and a report had to assume the cap."""
+    import copela
+    from copela import Budget, Case, StubProvider, Sweep, Target
+
+    sweep = Sweep(
+        ledger=Ledger(ledger_path),
+        budget=Budget(limit_usd=1.0),
+        providers={"stub": StubProvider(default="{}")},
+        build_prompt=lambda case: "formalize this",
+        parse_response=lambda text, case: None,  # type: ignore[return-value]
+        repeats=1,
+        max_tokens=4321,
+    )
+    sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
+
+    written = json.loads(ledger_path.read_text(encoding="utf-8").strip())
+    assert written["schema"] == "copela-ledger/1.1"
+    assert written["harness"] == f"copela {copela.__version__}"
+    assert written["max_tokens"] == 4321
+
+
+def test_a_record_written_before_schema_1_1_still_loads(ledger_path) -> None:
+    """A 1.0 record has neither field; it loads with both empty, which reads as unknown."""
+    old = make_record().to_json()
+    old["schema"] = "copela-ledger/1.0"
+    del old["harness"], old["max_tokens"]
+    ledger_path.write_text(json.dumps(old) + "\n", encoding="utf-8")
+
+    (record,) = Ledger(ledger_path).records()
+    assert (record.harness, record.max_tokens) == ("", 0)
