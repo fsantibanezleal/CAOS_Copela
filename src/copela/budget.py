@@ -17,6 +17,14 @@ class BudgetExceeded(RuntimeError):
     """Raised when a call would take the sweep past its declared budget."""
 
 
+class UnpricedModel(RuntimeError):
+    """Raised before a sweep's first call when a target has no price to bound it with.
+
+    A model with no price is projected at zero and charged at zero, so a guard asked to bound it
+    would never stop anything. Refusing is the only behaviour that keeps the promise.
+    """
+
+
 @dataclass
 class Budget:
     """A spend ceiling and a kill criterion, both declared before the sweep runs.
@@ -68,17 +76,21 @@ class Budget:
 
 def estimate(
     prompt: str,
-    expected_output_tokens: int,
+    output_tokens: int,
     input_per_mtok: float,
     output_per_mtok: float,
 ) -> float:
-    """A cost estimate before the call, from a crude token count.
+    """A cost estimate before the call: the prompt from a crude token count, the output at a bound.
 
-    Four characters per token is a rough English average and it is deliberately not refined: the
-    estimate exists to keep the guard conservative, and a guard that under-estimates is worse than
-    one that stops slightly early.
+    The sweep passes the call's ``max_tokens`` as ``output_tokens``, the most the call can bill,
+    and not a typical length. A typical length is what an earlier version used, 1200 tokens, and
+    reasoning models bill their reasoning as output: the first two measured spent 5206 and 7931
+    tokens on one case, four to seven times the projection, so the guard could pass a call it
+    should have refused.
+
+    Four characters per prompt token is a rough English average and it is deliberately not
+    refined: the estimate exists to keep the guard conservative, and a guard that under-estimates
+    is worse than one that stops slightly early.
     """
     input_tokens = max(1, len(prompt) // 4)
-    return (
-        input_tokens * input_per_mtok + expected_output_tokens * output_per_mtok
-    ) / 1_000_000
+    return (input_tokens * input_per_mtok + output_tokens * output_per_mtok) / 1_000_000
