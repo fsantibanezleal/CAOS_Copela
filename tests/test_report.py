@@ -61,6 +61,19 @@ def test_judge_verdict_is_labelled() -> None:
     assert "label" in str(caught.value)
 
 
+def test_a_candidate_that_never_ran_cannot_be_faithful() -> None:
+    """R-021. Strong layers that passed do not make faithful a candidate that did not run."""
+    for executable in (Outcome.FAIL, Outcome.UNDECIDED, Outcome.NOT_APPLICABLE, None):
+        results = [
+            LayerResult(Layer.STRUCTURAL, Outcome.PASS),
+            LayerResult(Layer.PROPERTY, Outcome.PASS),
+        ]
+        if executable is not None:
+            results.insert(0, LayerResult(Layer.EXECUTABLE, executable))
+        verdict = CandidateVerdict(tuple(results))
+        assert verdict.faithful is False, executable
+
+
 def test_the_judge_layer_never_counts_towards_faithful() -> None:
     """A judge pass alone does not make a candidate faithful."""
     only_judged = CandidateVerdict(
