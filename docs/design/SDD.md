@@ -215,9 +215,14 @@ R-027  WHERE a local model does not reason, THE provider SHALL NOT send or recor
 R-028  WHEN the local lane makes a call, THE completion SHALL carry the digest of the weights behind
        the tag as part of the model version.
        Gate: tests/test_providers.py::test_the_local_lane_records_the_weights_it_ran
+
+R-029  WHEN a candidate and its reference are both infeasible and differ in canonical form, THE
+       structural layer SHALL report UNDECIDED, and its detail SHALL say both are infeasible rather
+       than name an optimum.
+       Gate: tests/test_sweep.py::test_two_infeasible_models_are_described_as_infeasible_not_as_one_optimum
 ```
 
-R-013 to R-028 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-029 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -284,13 +289,17 @@ reasoning switch on a model with no reasoning and ignores it, so recording `thin
 claimed a control that did not exist. R-028 because a tag is a name that can be re-pulled onto
 other weights, and the ledger kept only the name.
 
+R-029 came from classifying the first sweeps outside Anthropic. On Enunciado's contradictory case,
+opt-019, both Claude candidates were infeasible, like the reference, and the structural detail read
+"both solve to the same optimum" for a pair with no optimum at all.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-028 | all pass, no skips (0.03.001) |
+| R-001 to R-029 | all pass, no skips (0.03.002) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
@@ -318,6 +327,13 @@ requirements here, which is the honest state rather than requirements marked pen
   layer never fails a candidate that the structural layer passed, it is decoration and is either
   strengthened or removed, not kept for appearances.
 - **Cost.** Bounded by section 8, enforced by R-005.
+- **A contradictory case cannot be passed.** The executable layer counts only a feasible optimum
+  as a run, so a candidate that proves a contradictory case infeasible, which is the right answer,
+  is recorded as a failure to run, and no strong layer can then pass it: agreeing on infeasibility
+  proves no more than agreeing on a value (R-029). Counting proven infeasibility as a run would need
+  a structural check able to pass such a case, such as comparing irreducible infeasible subsystems
+  through provenance, or it would move a correct answer into the gap. Open, and a decision rather
+  than a fix, because either change moves published rates.
 
 ## 12. Deploy driver
 
