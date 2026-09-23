@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.03.002] - 2026-09-23
+
+### Fixed
+
+- **Two infeasible models were described as agreeing on an optimum (R-029).** When a candidate and
+  its reference are both infeasible and differ in canonical form, the structural layer reported
+  UNDECIDED, correctly, with the detail "both solve to the same optimum". Neither has one. The detail
+  now says both are infeasible and that a wrong model can be infeasible too. The outcome is
+  unchanged; only records written from this release carry the corrected text.
+
+### Documented
+
+- A contradictory case cannot be passed: the executable layer counts only a feasible optimum as a
+  run. Recorded as an open risk in the design document, since changing it moves published rates.
+
 ## [0.03.001] - 2026-09-23
 
 ### Fixed
