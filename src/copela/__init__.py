@@ -30,8 +30,8 @@ from .verdicts import (
     Rate,
 )
 
-__version__ = "0.2.1"
-__display_version__ = "0.01.000"
+__version__ = "0.2.2"
+__display_version__ = "0.02.002"
 
 __all__ = [
     "JUDGE_LABEL",
