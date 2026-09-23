@@ -118,9 +118,13 @@ copela report runs.jsonl
 gap report
 ============================================================
 
-  anthropic/claude-sonnet-5 [optimization]  ran 0.940 [...] n=50  faithful 0.720 [...] n=50  gap +0.220
-  ollama/qwen3:8b [optimization]            ran 0.620 [...] n=50  faithful 0.340 [...] n=50  gap +0.280
+  anthropic/claude-sonnet-5 [optimization]  ran 0.550 [0.342, 0.742] over n=20  faithful 0.500 [0.299, 0.701] over n=20  gap +0.050
+  anthropic/claude-haiku-4-5 [optimization]  ran 0.250 [0.112, 0.469] over n=20  faithful 0.200 [0.081, 0.416] over n=20  gap +0.050
 ```
+
+That is real output, from the ledger Enunciado publishes. This guide used to show two invented
+rows (n=50, a local model that was never run) with the intervals elided, which in a tool whose
+subject is unverified numbers is the one thing a guide must not do.
 
 Read the gap, not the ran rate. The ran rate is the number that is already reported everywhere and
 it is the one that overstates.
