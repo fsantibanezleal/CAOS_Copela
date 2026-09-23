@@ -282,10 +282,21 @@ class Sweep:
                 Layer.STRUCTURAL, Outcome.PASS, "canonical forms are equal"
             )
 
-        disagreement = self._answers_disagree(candidate, case)
+        disagreement, both_infeasible = self._answers_disagree(candidate, case)
         if disagreement is not None:
             return LayerResult(Layer.STRUCTURAL, Outcome.FAIL, disagreement)
 
+        if both_infeasible:
+            # There is no optimum to agree on, and the message used to say there was: "both solve
+            # to the same optimum" was written into every ledger record of a contradictory case.
+            # Agreeing that no feasible point exists proves no more than agreeing on a value: a
+            # wrong model can be infeasible too.
+            return LayerResult(
+                Layer.STRUCTURAL,
+                Outcome.UNDECIDED,
+                "canonical forms differ and both are infeasible, which does not establish "
+                "equivalence: a wrong model can be infeasible too",
+            )
         return LayerResult(
             Layer.STRUCTURAL,
             Outcome.UNDECIDED,
@@ -293,28 +304,31 @@ class Sweep:
             "equivalence: compensating errors reach the right number",
         )
 
-    def _answers_disagree(self, candidate: Problem, case: Case) -> str | None:
-        """Return a reason when candidate and reference solve to different optima, else None.
+    def _answers_disagree(self, candidate: Problem, case: Case) -> tuple[str | None, bool]:
+        """A reason when candidate and reference solve to different answers, else None; and
+        whether both are infeasible, so an agreement is described as the one it is.
 
-        Returns None whenever the comparison cannot be made, because an unmade comparison must
-        never read as a failure any more than it may read as a pass.
+        The reason is None whenever the comparison cannot be made, because an unmade comparison
+        must never read as a failure any more than it may read as a pass.
         """
         if self.solve is None or case.reference is None:
-            return None
+            return None, False
         try:
             mine = self.solve(candidate)
             theirs = self.solve(case.reference)
         except Exception:  # noqa: BLE001, an unsolvable pair simply cannot be compared
-            return None
+            return None, False
 
         if mine.feasible != theirs.feasible:
             return (
                 f"the reference is {'feasible' if theirs.feasible else 'infeasible'} and this "
                 f"candidate is {'feasible' if mine.feasible else 'infeasible'}, so they are not "
                 "the same model"
-            )
+            ), False
+        if not mine.feasible:
+            return None, True
         if mine.objective is None or theirs.objective is None:
-            return None
+            return None, False
 
         # Both optima are read in the minimising sense before they are compared. Maximising f and
         # minimising -f are the same model with optimal values of opposite sign, and comparing the
@@ -331,8 +345,8 @@ class Sweep:
                 f"solves to {mine.objective:.6g} where the reference solves to "
                 f"{theirs.objective:.6g}; the same case cannot have two optima, so these are "
                 "different models"
-            )
-        return None
+            ), False
+        return None, False
 
     def _excerpt(self, completion, verdicts: list[LayerResult]) -> str:
         """Keep a bounded excerpt of the response, but only when something failed.
