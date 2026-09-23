@@ -44,6 +44,13 @@ That direction is conclusive, and it is the only way this layer can fail a candi
 | differ | differ | `FAIL`, they are different models |
 | differ | agree | `UNDECIDED`, agreement does not prove equivalence |
 
+The optima are compared in the minimising sense: a maximum is negated first. Maximising f and
+minimising -f are the same model with optimal values of opposite sign, and before 0.02.001 the raw
+comparison refuted that rewrite as a different optimum (R-020). The tolerance is relative, 1e-6 of
+the reference's optimum, so the last bit of two solves by different paths is not read as a defect,
+and a comparison that cannot be made (either side does not solve) returns nothing rather than a
+verdict.
+
 The asymmetry in the last two rows is the honest part. A matching optimum never promotes a verdict
 to `PASS`, because **compensating errors reach the right number**, which is precisely the failure
 the anchor survey documents.
@@ -52,8 +59,11 @@ the anchor survey documents.
 frontier measurement it returned `UNDECIDED` on *every single* candidate that ran. The whole
 faithfulness rate therefore rested on internal invariants that had never failed anything, and the
 reported gap was exactly `+0.000`. A rate carried by a check that cannot fail is not a measurement.
-With refutation added, the same corpus and the same model report `+0.100`: two candidates that ran
-cleanly solve to 16 and 8080 where the references solve to 16.667 and 8200.
+With refutation added, the published measurement (twenty cases, two models, forty calls) holds two
+refutations: a Haiku 4.5 candidate that solves to 16 where its reference solves to 16.667, and a
+Sonnet 5 candidate that solves to 8080 against 8200. Each model's gap is `+0.050`. The layer still
+returned `PASS` on none of the sixteen candidates that ran, so the other fourteen faithful verdicts
+rest on the property layer.
 
 If a case has no reference formalization, this layer reports `NOT_APPLICABLE` instead of inventing
 an opinion.
