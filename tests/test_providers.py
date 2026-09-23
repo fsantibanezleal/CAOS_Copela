@@ -201,3 +201,88 @@ def test_reasoning_with_no_answer_is_a_truncation_on_every_lane(lane, monkeypatc
     ), completion.text
     assert completion.text.endswith("]")
     assert completion.output_tokens == 8192
+
+
+def _local_server(monkeypatch, *, capabilities, window=40960, digest="500a1f067a9f782620b40bee"):
+    """A fake Ollama server, routed by path. Returns the generate requests it received."""
+    received: list[dict] = []
+
+    def urlopen(request, timeout=None):
+        url = getattr(request, "full_url", request)
+        if url.endswith("/api/show"):
+            body = {"capabilities": capabilities, "model_info": {"qwen3.context_length": window}}
+        elif url.endswith("/api/tags"):
+            body = {"models": [{"name": "m:8b", "digest": digest}]}
+        else:
+            received.append(json.loads(request.data))
+            body = {"model": "m:8b", "response": "{}", "done_reason": "stop", "eval_count": 9}
+        return _Body(json.dumps(body).encode("utf-8"))
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    return received
+
+
+def test_the_local_lane_sizes_its_context_to_hold_the_cap(monkeypatch) -> None:
+    """R-026: the server's default context (4096 on an 8 GB card) is shifted silently when a
+    generation outgrows it, so every call asks for one that holds the prompt and the whole cap."""
+    received = _local_server(monkeypatch, capabilities=["completion", "thinking"])
+    prompt = "x" * 3358  # the first corpus case's prompt length
+    completion = providers.OllamaProvider(host="http://local.test").complete(
+        prompt, model_id="m:8b", max_tokens=8192
+    )
+    num_ctx = received[0]["options"]["num_ctx"]
+    assert num_ctx >= len(prompt) // 2 + 8192 and num_ctx % 4096 == 0, num_ctx
+    assert f"#num_ctx={num_ctx}" in completion.fingerprint
+
+    for length in (0, 1, 4095, 8192, 20000):
+        size = providers.OllamaProvider.context_for("y" * length, 8192)
+        assert size >= length // 2 + 8192 and size % 4096 == 0, (length, size)
+
+
+def test_a_window_too_small_for_the_cap_is_refused_rather_than_shifted(monkeypatch) -> None:
+    _local_server(monkeypatch, capabilities=["completion"], window=8192)
+    with pytest.raises(providers.ProviderError) as caught:
+        providers.OllamaProvider(host="http://local.test").complete(
+            "x" * 3358, model_id="m:8b", max_tokens=8192
+        )
+    assert "8192-token context" in str(caught.value)
+
+    # Between what is needed and the next step, the window itself is used.
+    received = _local_server(monkeypatch, capabilities=["completion"], window=10000)
+    providers.OllamaProvider(host="http://local.test").complete(
+        "x" * 3358, model_id="m:8b", max_tokens=8192
+    )
+    assert received[0]["options"]["num_ctx"] == 10000
+
+
+def test_a_model_that_does_not_reason_gets_no_reasoning_switch(monkeypatch) -> None:
+    """R-027: think=False on a model with no reasoning is a no-op the server accepts silently, so
+    sending and recording it would claim a control that did not exist."""
+    received = _local_server(monkeypatch, capabilities=["completion", "tools"])
+    completion = providers.OllamaProvider(host="http://local.test", think=False).complete(
+        "p", model_id="m:8b"
+    )
+    assert "think" not in received[0]
+    assert "#think=n/a#" in completion.fingerprint
+
+    received = _local_server(monkeypatch, capabilities=["completion", "thinking"])
+    completion = providers.OllamaProvider(host="http://local.test", think=False).complete(
+        "p", model_id="m:8b"
+    )
+    assert received[0]["think"] is False
+    assert "#think=False#" in completion.fingerprint
+
+
+def test_the_local_lane_records_the_weights_it_ran(monkeypatch) -> None:
+    """R-028: a tag is a name that can be re-pulled onto other weights; the digest is not."""
+    # /api/tags reports the digest as bare hex, as qwen3:8b's is here.
+    _local_server(monkeypatch, capabilities=["completion"], digest="500a1f067a9f782620b40bee")
+    completion = providers.OllamaProvider(host="http://local.test").complete("p", model_id="m:8b")
+    assert completion.model_version == "m:8b@500a1f067a9f"
+
+
+def test_the_local_host_is_taken_in_ollamas_own_form(monkeypatch) -> None:
+    """OLLAMA_HOST is written without a scheme by Ollama's own tools; it must still work here."""
+    monkeypatch.setenv("OLLAMA_HOST", "127.0.0.1:11435")
+    assert providers.OllamaProvider()._host == "http://127.0.0.1:11435"
+    assert providers.OllamaProvider(host="http://h:1/")._host == "http://h:1"

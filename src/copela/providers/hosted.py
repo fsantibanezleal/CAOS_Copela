@@ -242,19 +242,97 @@ class OllamaProvider(Provider):
 
     name = "ollama"
 
-    def __init__(self, host: str | None = None, think: bool | None = None) -> None:
-        """``think`` controls a reasoning model's visible reasoning.
+    #: The context is requested in steps of this many tokens, so the cases of one corpus land on one
+    #: size and the server does not reload the model between them.
+    CONTEXT_STEP = 4096
 
-        It matters more than it looks. A reasoning model spends its output budget on reasoning
-        first, so a small one can emit three thousand tokens of thought, hit the limit, and return
-        nothing at all. Measured on qwen3.5:4b: every call produced about 3100 tokens of reasoning
-        and no answer, which reads as a total formalization failure and is actually a truncation.
+    def __init__(
+        self,
+        host: str | None = None,
+        think: bool | None = None,
+        timeout_s: float = 3600.0,
+    ) -> None:
+        """``think`` switches a reasoning model's reasoning; ``timeout_s`` bounds one call.
 
-        ``None`` leaves the model's default alone, ``False`` asks it to answer directly. Whichever
-        is used goes in the run record, because it changes what is being measured.
+        A reasoning model spends its output cap on reasoning first: qwen3:4b, on the first corpus
+        case with a context that held the whole cap, reasoned for all 8192 tokens and answered
+        nothing. ``False`` asks a reasoning model to answer directly and ``None`` leaves its default
+        alone. A model that does not reason gets neither, because the switch would be a no-op and
+        recording it would claim a control that did not exist (R-027).
+
+        ``False`` is a request, and the model's template decides whether it is honoured. qwen3:8b's
+        template appends ``/no_think`` and pre-fills an empty reasoning block; qwen3:4b's has no off
+        path, and with ``False`` it wrote the same 29083 characters of reasoning into its answer
+        instead of into the reasoning field. The fingerprint records what was asked; the response
+        in the ledger shows what happened.
+
+        The timeout is an hour rather than the hosted lanes' fifteen minutes: a local call costs
+        nothing, and a model larger than the GPU runs partly on the CPU at a few tokens a second,
+        so a full cap can take longer than a hosted call ever does.
         """
-        self._host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        # Ollama's own tools take the host without a scheme ("127.0.0.1:11435"); urllib does not.
+        self._host = (host if "://" in host else f"http://{host}").rstrip("/")
         self._think = think
+        self._timeout_s = timeout_s
+        self._shown: dict[str, dict] = {}
+        self._digests: dict[str, str] | None = None
+
+    @classmethod
+    def context_for(cls, prompt: str, max_tokens: int) -> int:
+        """A context that holds the prompt and the whole output cap (R-026).
+
+        The server's default does not: it picks one from the GPU's memory, 4096 tokens on an 8 GB
+        card, and a generation that outgrows it is not stopped. The server shifts the context,
+        silently, and the model goes on writing with the start of its prompt gone. Measured on
+        qwen3:4b and the first corpus case: 942 prompt tokens and 6109 generated inside a 4096
+        window, finishing "stop" with an answer a fifth the length of a formalization. Two
+        characters per token over-counts English, which is the safe direction here.
+        """
+        needed = len(prompt) // 2 + max_tokens
+        return -(-needed // cls.CONTEXT_STEP) * cls.CONTEXT_STEP
+
+    def _post(self, path: str, body: dict[str, object], timeout: float) -> dict:
+        import json
+        import urllib.request
+
+        request = urllib.request.Request(
+            f"{self._host}{path}",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def _show(self, model_id: str) -> dict:
+        """What the server says about a model, once per model: whether it reasons, its window."""
+        if model_id not in self._shown:
+            try:
+                self._shown[model_id] = self._post("/api/show", {"model": model_id}, 30)
+            except Exception:  # noqa: BLE001, an older server without the endpoint: assume nothing
+                self._shown[model_id] = {}
+        return self._shown[model_id]
+
+    def _tags(self) -> list[dict]:
+        import json
+        import urllib.error
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=10) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise ProviderError(f"cannot list ollama models at {self._host}: {error}") from error
+        return list(body.get("models", []))
+
+    def _digest(self, model_id: str) -> str:
+        """The digest of the weights behind a tag (R-028). A tag is a name, and it can be re-pulled."""
+        if self._digests is None:
+            try:
+                self._digests = {m["name"]: str(m.get("digest", "")) for m in self._tags()}
+            except ProviderError:
+                self._digests = {}
+        return self._digests.get(model_id, "")
 
     def complete(
         self,
@@ -267,11 +345,32 @@ class OllamaProvider(Provider):
     ) -> Completion:
         import json
         import urllib.error
-        import urllib.request
+
+        shown = self._show(model_id)
+        capabilities = shown.get("capabilities")
+        reasons = None if capabilities is None else "thinking" in capabilities
+        window = next(
+            (
+                int(value)
+                for key, value in (shown.get("model_info") or {}).items()
+                if key.endswith(".context_length")
+            ),
+            None,
+        )
+
+        num_ctx = self.context_for(prompt, max_tokens)
+        if window is not None and num_ctx > window:
+            if len(prompt) // 2 + max_tokens > window:
+                raise ProviderError(
+                    f"ollama: {model_id} has a {window}-token context, and the prompt plus a cap "
+                    f"of {max_tokens} need more; the server would shift the context silently"
+                )
+            num_ctx = window
 
         options: dict[str, object] = {
             "temperature": temperature,
             "num_predict": max_tokens,
+            "num_ctx": num_ctx,
         }
         if seed is not None:
             options["seed"] = seed
@@ -282,20 +381,16 @@ class OllamaProvider(Provider):
             "stream": False,
             "options": options,
         }
-        if self._think is not None:
+        if self._think is not None and reasons is not False:
             body["think"] = self._think
-
-        payload = json.dumps(body).encode("utf-8")
-        request = urllib.request.Request(
-            f"{self._host}/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
 
         started = time.perf_counter()
         try:
-            with urllib.request.urlopen(request, timeout=900) as response:
-                response_body = json.loads(response.read().decode("utf-8"))
+            response_body = self._post("/api/generate", body, self._timeout_s)
+        except urllib.error.HTTPError as error:
+            # The body names the cause ("model not found", out of memory); the status alone does not.
+            detail = error.read().decode("utf-8", errors="replace")[:500]
+            raise ProviderError(f"ollama call failed: HTTP {error.code}: {detail}") from error
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"ollama call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
@@ -311,14 +406,21 @@ class OllamaProvider(Provider):
                 "Raise max_tokens or set think=False",
             )
 
+        served = str(response_body.get("model", model_id))
+        digest = self._digest(model_id)
         return Completion(
             text=text,
             model_id=model_id,
-            model_version=str(response_body.get("model", model_id)),
-            # A local model's serving configuration is the host itself, plus whether reasoning was
-            # on, because that changes what is being measured. The same weights on two machines,
-            # or with reasoning toggled, are not the same lane.
-            fingerprint=f"ollama@{self._host}#think={self._think}",
+            # The tag plus the weights behind it, since a tag can be re-pulled onto new weights.
+            model_version=f"{served}@{digest[:12]}" if digest else served,
+            # A local model's serving configuration is the host, whether reasoning was switched,
+            # and the context it was given, because each changes what is being measured. The same
+            # weights on two machines, with reasoning toggled, or in a smaller window, are not the
+            # same lane. "n/a" is a model with no reasoning to switch.
+            fingerprint=(
+                f"ollama@{self._host}#think={'n/a' if reasons is False else self._think}"
+                f"#num_ctx={num_ctx}"
+            ),
             input_tokens=int(response_body.get("prompt_eval_count", 0)),
             output_tokens=int(response_body.get("eval_count", 0)),
             latency_ms=latency_ms,
@@ -327,16 +429,7 @@ class OllamaProvider(Provider):
 
     def models(self) -> dict[str, Pricing]:
         """Whatever the local server has pulled. Queried, never assumed."""
-        import json
-        import urllib.error
-        import urllib.request
-
-        try:
-            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=10) as response:
-                body = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise ProviderError(f"cannot list ollama models at {self._host}: {error}") from error
-        return {model["name"]: Pricing() for model in body.get("models", [])}
+        return {model["name"]: Pricing() for model in self._tags()}
 
 
 class ChatCompletionsProvider(Provider):
