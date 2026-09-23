@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.04.000] - 2026-09-23
+
+### Added
+
+- **Each ledger record says which copela scored it and the output cap it ran at (R-033).** Two new
+  fields, `harness` (`"copela 0.4.0"`) and `max_tokens`, and schema `copela-ledger/1.1`. One ledger
+  had held records scored by three copela versions, which judge an unbounded candidate differently,
+  with nothing in a record to tell them apart; and a report had to assume the cap, because a record
+  could not state its own. A record written before 1.1 still loads, with both fields empty, which
+  reads as unknown rather than as a guess.
+
 ## [0.03.003] - 2026-09-23
 
 ### Fixed

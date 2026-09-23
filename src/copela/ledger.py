@@ -25,7 +25,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-LEDGER_SCHEMA = "copela-ledger/1.0"
+#: 1.1 adds `harness` and `max_tokens`; a 1.0 record still loads, with both empty.
+LEDGER_SCHEMA = "copela-ledger/1.1"
 
 
 class LedgerError(RuntimeError):
@@ -76,6 +77,14 @@ class Record:
     #: failure because a successful run is already described by its verdicts.
     response_excerpt: str = ""
     recorded_at: str = ""
+    #: The copela version that scored the call, and the output cap it ran at (R-033).
+    #:
+    #: Both were missing, and both turned out to matter. One ledger held records scored by three
+    #: copela versions, which judge an unbounded candidate differently, with nothing in a record
+    #: to tell them apart; and a report had to assume the cap, because a record could not say it.
+    #: Records written before schema 1.1 load with both empty: unknown, not guessed.
+    harness: str = ""
+    max_tokens: int = 0
 
     def to_json(self) -> dict[str, object]:
         data = {
@@ -100,6 +109,8 @@ class Record:
             "response_excerpt": self.response_excerpt,
             "recorded_at": self.recorded_at
             or datetime.now(UTC).isoformat(timespec="seconds"),
+            "harness": self.harness,
+            "max_tokens": self.max_tokens,
         }
         return data
 
@@ -127,6 +138,8 @@ class Record:
             error=str(data.get("error", "")),
             response_excerpt=str(data.get("response_excerpt", "")),
             recorded_at=str(data.get("recorded_at", "")),
+            harness=str(data.get("harness", "")),
+            max_tokens=int(data.get("max_tokens", 0)),  # type: ignore[arg-type]
         )
 
 
