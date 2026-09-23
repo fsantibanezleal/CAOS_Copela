@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.03.001] - 2026-09-23
+
+### Fixed
+
+- **The local lane ran in a 4096-token window, whatever `max_tokens` said (R-026).** It never set a
+  context, so the server chose one from the GPU's memory, 4096 tokens on an 8 GB card. A generation
+  that outgrows the window is not stopped: the server shifts the context, silently, and the model
+  writes on without the start of its prompt. Measured on qwen3:4b and the first Enunciado case: in
+  the default window, 942 prompt tokens and 6109 generated, finishing "stop" with an answer a fifth
+  the length of a formalization; in a window that held the cap, all 8192 tokens of reasoning and no
+  answer. Every call now requests a context that holds the prompt and the whole cap, in 4096-token
+  steps so a corpus lands on one size, and refuses a model whose window cannot. The local lane's
+  earlier result on qwen3.5:4b ran in the default window and says nothing about the cap.
+- **The reasoning switch was sent and recorded for models with no reasoning (R-027).** The server
+  accepts `think` on such a model and ignores it. The lane now asks the server what the model can do
+  and records `think=n/a` for one that cannot reason.
+- The local lane records the digest of the weights behind a tag (R-028), since a tag can be
+  re-pulled onto other weights, and the context it requested, in the fingerprint.
+- `OLLAMA_HOST` in Ollama's own form, without a scheme (`127.0.0.1:11435`), no longer fails.
+- A local call's HTTP error keeps its body, and the local timeout is an hour: a model larger than
+  the GPU runs partly on the CPU, and a full cap can outlast fifteen minutes.
+
 ## [0.03.000] - 2026-09-23
 
 ### Added
