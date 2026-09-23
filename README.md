@@ -122,9 +122,21 @@ copela report runs.jsonl           # the gap
 Because a benchmark of AI-assisted modelling and simulation reports that
 [no single model dominates across engine types](https://arxiv.org/abs/2605.28994), with
 task-specific tradeoffs between speed and accuracy. A ranking claimed from one model contradicts a
-published result, so the provider seam is a requirement rather than tidiness: Anthropic, Groq and
-local models through Ollama, behind one interface, with no vendor name anywhere outside
-`copela/providers/`. A test enforces that.
+published result, so the provider seam is a requirement rather than tidiness: Anthropic, Groq,
+Z.AI, DeepSeek and local models through Ollama, behind one interface, with no vendor name anywhere
+outside `copela/providers/`. A test enforces that.
+
+| Provider | Key | What it pins |
+|---|---|---|
+| `anthropic` | `ANTHROPIC_API_KEY` | effort where the model takes it; no temperature or seed exists |
+| `groq` | `GROQ_API_KEY` | temperature, seed, and the system fingerprint the server returns |
+| `zai` | `ZAI_API_KEY`, and `ZAI_BASE_URL` for a coding-plan key | effort from GLM-5.2 up, greedy decoding for temperature 0, no seed |
+| `deepseek` | `DEEPSEEK_API_KEY` | effort; temperature has no effect in thinking mode, no seed |
+| `ollama` | none (`OLLAMA_HOST`) | temperature, seed, and whether reasoning was on |
+
+Each records what it actually pinned, and the model the server says it ran, which is not always the
+one requested. A reasoning model that spends its whole output cap on reasoning is recorded as that
+truncation, with the length of the reasoning, never as an empty answer.
 
 ## What reproducibility means here
 
@@ -149,11 +161,15 @@ reads it and skips the calls already done.
 Every sweep declares a budget and a kill criterion before it runs, and the guard refuses the call
 that **would** exceed the ceiling rather than noticing afterwards.
 
+It projects each call at the most that call can bill, its output cap, because reasoning models bill
+their reasoning as output: the first two measured spent 5206 and 7931 tokens on one case. And it
+refuses to start a sweep of a model it has no price for, because it would count those calls as free.
+
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its eighteen requirements names the test that
-verifies it.
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its twenty-five requirements names the test
+that verifies it.
 
 ## Related
 

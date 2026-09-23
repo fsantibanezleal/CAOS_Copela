@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 from .base import Completion, Pricing, Provider, ProviderError, StubProvider
-from .hosted import AnthropicProvider, GroqProvider, OllamaProvider
+from .hosted import (
+    AnthropicProvider,
+    ChatCompletionsProvider,
+    DeepSeekProvider,
+    GroqProvider,
+    OllamaProvider,
+    ZaiProvider,
+)
 
 #: Constructors by seam name. The harness selects by string and never imports a vendor module.
 REGISTRY: dict[str, type[Provider]] = {
     "anthropic": AnthropicProvider,
+    "deepseek": DeepSeekProvider,
     "groq": GroqProvider,
     "ollama": OllamaProvider,
     "stub": StubProvider,
+    "zai": ZaiProvider,
 }
 
 
@@ -27,12 +36,15 @@ def get(name: str, **kwargs: object) -> Provider:
 __all__ = [
     "REGISTRY",
     "AnthropicProvider",
+    "ChatCompletionsProvider",
     "Completion",
+    "DeepSeekProvider",
     "GroqProvider",
     "OllamaProvider",
     "Pricing",
     "Provider",
     "ProviderError",
     "StubProvider",
+    "ZaiProvider",
     "get",
 ]

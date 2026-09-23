@@ -18,6 +18,12 @@ so the sweep stops below the ceiling rather than reporting an overrun afterwards
 consecutive-failure count is the kill criterion: a sweep whose calls are all failing is buying
 nothing, and running it to the ceiling is waste.
 
+Each call is projected at the most it can bill, `max_tokens` of output, so a sweep of reasoning
+models stops earlier than their typical spend would suggest. That is the point: they bill their
+reasoning as output, and a projection at a typical length let through calls it should have refused.
+A model the provider has no price for is refused before the first call, with the list of the models
+it does price.
+
 ## 2. Choose the targets, plural
 
 ```python
@@ -26,16 +32,25 @@ from copela import Target
 
 providers = {
     "ollama": get("ollama"),        # local, free, run it first
+    "zai": get("zai"),              # hosted; GLM-4.5-Flash is free
     "groq": get("groq"),            # cheap hosted
+    "deepseek": get("deepseek"),    # hosted reasoning
     "anthropic": get("anthropic"),  # frontier, on the reduced set
 }
 
 targets = [
     Target("ollama", "qwen3:8b"),
+    Target("zai", "glm-4.5-flash"),
     Target("groq", "openai/gpt-oss-120b"),
+    Target("deepseek", "deepseek-v4-pro"),
     Target("anthropic", "claude-sonnet-5"),
 ]
 ```
+
+`copela models` prints what each provider prices. Keys come from the environment, never from a
+file in the repo. A Z.AI GLM Coding Plan key is refused by the pay-per-token endpoint; set
+`ZAI_BASE_URL=https://api.z.ai/api/coding/paas/v4` for it, and read the ledger's cost as the
+list-price equivalent of calls drawn from the plan's quota.
 
 Cheap first is the ladder: local, then small hosted, then frontier on the reduced case set. And
 plural is the requirement, not a preference, because no single model dominates across engine types.
