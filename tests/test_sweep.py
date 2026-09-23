@@ -209,3 +209,65 @@ def test_two_infeasible_models_are_described_as_infeasible_not_as_one_optimum(le
     assert structural["outcome"] == Outcome.UNDECIDED.value, structural
     assert "both are infeasible" in structural["detail"], structural
     assert "optimum" not in structural["detail"], structural
+
+
+def _unbounded_blend(extra=()):
+    """The blend, maximising its cost with nothing above the pits: no optimum exists."""
+    from planteo import Objective, Sense
+
+    from tests.conftest import make_blend
+
+    blend = make_blend()
+    original = blend.objectives[0]
+    return dataclasses.replace(
+        blend,
+        relations=blend.relations + tuple(extra),
+        objectives=(Objective(Sense.MAXIMISE, original.expression, name=original.name),),
+    )
+
+
+def test_an_unbounded_candidate_does_not_run(ledger_path) -> None:
+    """R-030: reaching no optimum is not a run, and an unbounded model reaches none.
+
+    The solver reports a feasible point, so it used to pass the executable layer; the structural
+    layer then described it as agreeing on an optimum and the property layer invented a refutation
+    from the missing argmin.
+    """
+    from tests.conftest import make_blend
+
+    layers = _run(ledger_path, make_blend(), _unbounded_blend())
+    executable = layers[Layer.EXECUTABLE.value]
+    assert executable["outcome"] == Outcome.FAIL.value, executable
+    assert executable["detail"] == "unbounded"
+
+
+def test_an_unbounded_candidate_is_refuted_against_a_reference_with_an_optimum(ledger_path) -> None:
+    """R-031: the same case cannot have an optimum and none."""
+    from tests.conftest import make_blend
+
+    layers = _run(ledger_path, make_blend(), _unbounded_blend())
+    structural = layers[Layer.STRUCTURAL.value]
+    assert structural["outcome"] == Outcome.FAIL.value, structural
+    assert "is unbounded" in structural["detail"] and "solves to 900" in structural["detail"]
+
+
+def test_two_unbounded_models_are_described_as_unbounded(ledger_path) -> None:
+    from planteo import Comparator, Compare, Constant, Dimension, Ref
+
+    TONNE = Dimension.of("t", mass=1)
+    redundant = Compare(Ref("x_a"), Comparator.GE, Constant(0.0, TONNE), name="a_nonnegative")
+    layers = _run(ledger_path, _unbounded_blend(), _unbounded_blend([redundant]))
+    structural = layers[Layer.STRUCTURAL.value]
+    assert structural["outcome"] == Outcome.UNDECIDED.value, structural
+    assert "both are unbounded" in structural["detail"], structural
+
+
+def test_an_unbounded_candidate_leaves_the_relations_unevaluated(ledger_path) -> None:
+    """R-032: an unbounded candidate has no optimum or argmin to compare, so no relation can hold
+    or fail. The objective-scaling relation used to report FAIL on it."""
+    from tests.conftest import make_blend
+
+    layers = _run(ledger_path, make_blend(), _unbounded_blend())
+    prop = layers[Layer.PROPERTY.value]
+    assert prop["outcome"] == Outcome.NOT_APPLICABLE.value, prop
+    assert "unbounded" in prop["detail"]

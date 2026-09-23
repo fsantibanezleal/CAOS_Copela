@@ -265,6 +265,18 @@ def evaluate(
             ),
             (),
         )
+    if base.objective is None and problem.objectives:
+        # Unbounded: a feasible point and no optimum. The relations compare optima and argmins, so
+        # there is nothing to compare, and the objective-scaling relation used to report that as a
+        # FAIL ("no shared variables to compare"): a refutation invented from an absence (R-032).
+        return (
+            LayerResult(
+                Layer.PROPERTY,
+                Outcome.NOT_APPLICABLE,
+                "the candidate is unbounded, so the relations have nothing to compare against",
+            ),
+            (),
+        )
 
     outcomes: list[RelationOutcome] = []
     for relation in relations:
