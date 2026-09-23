@@ -8,6 +8,10 @@ gap = ran rate - faithful rate
 
 `ran` is what the field reports. `faithful` is what was asked. The subtraction is the product.
 
+A candidate is `faithful` when it ran, neither strong layer (structural, property) FAILED, and at
+least one of them PASSED (`Verdicts.faithful`). The last clause matters: a candidate on which both
+strong layers are UNDECIDED has not been shown faithful, and is not counted as such.
+
 It only exists while the layers are kept apart. Any weighting that produced one number would let a
 high executable rate conceal a low faithfulness rate, which is the exact failure being measured. So
 `CandidateVerdict` has no `score` property, `Cell` has none, `Report` has none, and

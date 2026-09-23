@@ -15,12 +15,20 @@ the job here, separating a formalization that is faithful from one that merely r
 gap report
 ============================================================
 
-  anthropic/claude-haiku-4-5 [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.250 [0.112, 0.469] over n=20  gap +0.100
+  anthropic/claude-sonnet-5 [optimization]  ran 0.550 [0.342, 0.742] over n=20  faithful 0.500 [0.299, 0.701] over n=20  gap +0.050
+  anthropic/claude-haiku-4-5 [optimization]  ran 0.250 [0.112, 0.469] over n=20  faithful 0.200 [0.081, 0.416] over n=20  gap +0.050
 ```
 
-That is a real run, not an illustration: 20 authored optimization cases, one repeat, measured
-2026-09-22. **ran** is what the field reports. **faithful** is what was asked for. The gap between
-them is the output, and no source found reports it across target families.
+That is the published measurement, re-derived by this release from its committed ledger with
+`copela report`: twenty authored optimization cases, two models, one repeat each, forty calls,
+1.23 USD, measured 2026-09-22 ([Enunciado](https://enunciado.fasl-work.com/benchmark)). **ran**
+is what the field reports. **faithful** is what was asked for. The gap between them is the
+output, and no source found reports it across target families.
+
+An earlier README showed a Haiku 4.5 pass over the same corpus at ran 0.350 and gap +0.100. That
+run was real and is superseded: Enunciado keeps it as the ledger from before an instrument fix,
+and the distance between the two passes fits inside their intervals, which is what the interval
+is for.
 
 Twenty cases at one repeat is a wide interval. It is enough to see a gap and not enough to rank
 close models, which is exactly why the interval is printed next to the number.
