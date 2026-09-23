@@ -218,10 +218,15 @@ class Sweep:
         else:
             try:
                 solution = self.solve(candidate)
+                # Running means reaching an optimum, or, for a model with no objective, a feasible
+                # point. An unbounded model reaches neither, and it used to pass: the solver reports
+                # a feasible point, so it read as a run, and the layers after it then compared an
+                # optimum against nothing (R-030).
+                reached = solution.feasible and not _unbounded(candidate, solution)
                 results.append(
                     LayerResult(
                         Layer.EXECUTABLE,
-                        Outcome.PASS if solution.feasible else Outcome.FAIL,
+                        Outcome.PASS if reached else Outcome.FAIL,
                         solution.detail,
                     )
                 )
@@ -282,20 +287,26 @@ class Sweep:
                 Layer.STRUCTURAL, Outcome.PASS, "canonical forms are equal"
             )
 
-        disagreement, both_infeasible = self._answers_disagree(candidate, case)
+        disagreement, agreement = self._answers_disagree(candidate, case)
         if disagreement is not None:
             return LayerResult(Layer.STRUCTURAL, Outcome.FAIL, disagreement)
 
-        if both_infeasible:
-            # There is no optimum to agree on, and the message used to say there was: "both solve
-            # to the same optimum" was written into every ledger record of a contradictory case.
-            # Agreeing that no feasible point exists proves no more than agreeing on a value: a
-            # wrong model can be infeasible too.
+        # Agreeing on an answer proves nothing, whatever the answer. The message says which answer
+        # was agreed on, because "both solve to the same optimum" was once written into records of
+        # pairs that had no optimum at all (R-029).
+        if agreement in {"infeasible", "unbounded"}:
             return LayerResult(
                 Layer.STRUCTURAL,
                 Outcome.UNDECIDED,
-                "canonical forms differ and both are infeasible, which does not establish "
-                "equivalence: a wrong model can be infeasible too",
+                f"canonical forms differ and both are {agreement}, which does not establish "
+                f"equivalence: a wrong model can be {agreement} too",
+            )
+        if agreement == "feasible":
+            return LayerResult(
+                Layer.STRUCTURAL,
+                Outcome.UNDECIDED,
+                "canonical forms differ and both are feasible with no objective to compare, which "
+                "does not establish equivalence",
             )
         return LayerResult(
             Layer.STRUCTURAL,
@@ -304,31 +315,49 @@ class Sweep:
             "equivalence: compensating errors reach the right number",
         )
 
-    def _answers_disagree(self, candidate: Problem, case: Case) -> tuple[str | None, bool]:
-        """A reason when candidate and reference solve to different answers, else None; and
-        whether both are infeasible, so an agreement is described as the one it is.
+    def _answers_disagree(
+        self, candidate: Problem, case: Case
+    ) -> tuple[str | None, str | None]:
+        """A reason when candidate and reference solve to different answers, else None; and, when
+        they agree on something other than an optimum, what it is ("infeasible", "unbounded",
+        "feasible"), so an agreement is described as the one it is.
 
         The reason is None whenever the comparison cannot be made, because an unmade comparison
         must never read as a failure any more than it may read as a pass.
         """
         if self.solve is None or case.reference is None:
-            return None, False
+            return None, None
         try:
             mine = self.solve(candidate)
             theirs = self.solve(case.reference)
         except Exception:  # noqa: BLE001, an unsolvable pair simply cannot be compared
-            return None, False
+            return None, None
 
         if mine.feasible != theirs.feasible:
             return (
                 f"the reference is {'feasible' if theirs.feasible else 'infeasible'} and this "
                 f"candidate is {'feasible' if mine.feasible else 'infeasible'}, so they are not "
                 "the same model"
-            ), False
+            ), None
         if not mine.feasible:
-            return None, True
+            return None, "infeasible"
+
+        # An unbounded model has no optimum, so against a reference that has one the comparison is
+        # conclusive: the same case cannot have an optimum and none. It used to fall through to
+        # "both solve to the same optimum", written about a candidate with no optimum (R-031).
+        mine_unbounded = _unbounded(candidate, mine)
+        theirs_unbounded = _unbounded(case.reference, theirs)
+        if mine_unbounded != theirs_unbounded:
+            mine_says = "is unbounded" if mine_unbounded else f"solves to {mine.objective:.6g}"
+            theirs_says = "is unbounded" if theirs_unbounded else f"solves to {theirs.objective:.6g}"
+            return (
+                f"the reference {theirs_says} and this candidate {mine_says}, so they are not the "
+                "same model"
+            ), None
+        if mine_unbounded:
+            return None, "unbounded"
         if mine.objective is None or theirs.objective is None:
-            return None, False
+            return None, "feasible"
 
         # Both optima are read in the minimising sense before they are compared. Maximising f and
         # minimising -f are the same model with optimal values of opposite sign, and comparing the
@@ -345,8 +374,8 @@ class Sweep:
                 f"solves to {mine.objective:.6g} where the reference solves to "
                 f"{theirs.objective:.6g}; the same case cannot have two optima, so these are "
                 "different models"
-            ), False
-        return None, False
+            ), None
+        return None, None
 
     def _excerpt(self, completion, verdicts: list[LayerResult]) -> str:
         """Keep a bounded excerpt of the response, but only when something failed.
@@ -394,6 +423,16 @@ class Sweep:
                 response_excerpt=self._excerpt(completion, verdicts),
             )
         )
+
+
+def _unbounded(problem: Problem, solution: properties.Solution) -> bool:
+    """The solver found a feasible point and no optimum, for a model that has an objective.
+
+    The solver wrapper reports an unbounded model as feasible with no objective value. A model with
+    no objective at all is also reported without one, and is not unbounded: it asked only for a
+    feasible point.
+    """
+    return solution.feasible and solution.objective is None and bool(problem.objectives)
 
 
 def _minimising(problem: Problem, value: float) -> float:
