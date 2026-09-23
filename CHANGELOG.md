@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.02.003] - 2026-09-23
+
+### Fixed
+
+- **A candidate that never ran could be `faithful` (R-021).** `CandidateVerdict.faithful` checked
+  that no strong layer failed and one passed, and never that the executable layer passed. The sweep
+  never records a structural or property verdict without a run, so no measured rate changes, but the
+  property is public API, and the report's own comment says a candidate that never ran cannot be
+  faithful. Found by a consistency test in Enunciado that compares the three places the rule is
+  stated, over every combination of layer outcomes rather than over the ledger.
+
 ## [0.02.002] - 2026-09-23
 
 A documentation release. No behaviour changed.
