@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.02.000] - 2026-09-22
+
+The release that makes the published measurement reproducible. 0.01.000 carried a structural layer
+that could not fail, so a faithfulness rate computed with it was carried by a check that never
+refuted anything. Anything measured with 0.01.000 should be re-measured with this.
+
+### Fixed
+
+- **The structural layer can now REFUTE.** It compared canonical forms, and when they differed it
+  returned UNDECIDED and stopped. Measured over twenty authored optimization cases it returned
+  UNDECIDED on every single candidate that ran, so the whole faithfulness rate rested on internal
+  invariants that had never failed anything. The missing direction is conclusive and cheap: two
+  formalizations of the same case that solve to different optima are not the same model. The
+  asymmetry is kept deliberately, and a matching optimum never promotes a verdict to PASS, because
+  compensating errors reach the right number.
+- **A limit of the instrument is no longer charged to the subject.** A model the configured solver
+  cannot express raises `ModelNotSupported`, which is recorded as NOT_APPLICABLE and excluded from
+  both rates rather than counted as a failed formalization.
+- **The gap is UNDEFINED, not zero, when nothing ran.** Reporting `gap +0.000` for a model that
+  failed every call reads as "no gap" and means "no measurement".
+- **The ledger takes an exclusive lock.** Two sweeps sharing one file interleaved records from two
+  versions of the code, which is not a visible error but a dataset that mixes two instruments.
+- **A failing response keeps a bounded excerpt.** A digest says a response existed and nothing about
+  what was wrong with it, and re-running to reproduce does not work because hosted inference is not
+  deterministic.
+- **The Anthropic provider matches the current API**: the model ids carry no date suffix, the
+  pricing is current, `temperature` is not sent because the API no longer accepts it, and reasoning
+  effort is sent only to the models that take it. The fingerprint records which controls were
+  actually exercised, including when the answer is none.
+
 ## [0.01.000] - 2026-09-22
 
 First release. The harness, its four layers, the ledger, the budget guard and the optimization
