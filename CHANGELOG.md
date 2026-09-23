@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.02.002] - 2026-09-23
+
+A documentation release. No behaviour changed.
+
+### Fixed
+
+- **The README showed a superseded run as the current one.** Its example, Haiku 4.5 at ran 0.350
+  and gap +0.100, was a real pass from before an instrument fix. It now shows the published
+  measurement, both models at gap +0.050, as `copela report` prints it from the committed ledger,
+  and says what the earlier pass was.
+- **The sweep guide showed invented output**: two rows at n=50, one for a local model that was
+  never run, intervals elided. Replaced by real output.
+- The four-layers page states `faithful` exactly as `Verdicts.faithful` computes it: it ran, no
+  strong layer failed, and at least one passed.
+- `__display_version__` read 0.01.000 through 0.02.000 and 0.02.001. The publish gate checks the
+  tag, `VERSION` and the manifest, and not this string.
+
 ## [0.02.001] - 2026-09-23
 
 ### Fixed
