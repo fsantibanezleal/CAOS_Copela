@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from planteo import Problem, validate
+from planteo import Problem, Sense, validate
 
 from .budget import Budget, BudgetExceeded, estimate
 from .ledger import CallKey, Ledger, Record, digest
@@ -292,8 +292,17 @@ class Sweep:
         if mine.objective is None or theirs.objective is None:
             return None
 
-        tolerance = 1e-6 * max(1.0, abs(theirs.objective))
-        if abs(mine.objective - theirs.objective) > tolerance:
+        # Both optima are read in the minimising sense before they are compared. Maximising f and
+        # minimising -f are the same model with optimal values of opposite sign, and comparing the
+        # raw values would refute that style rewrite as "a different optimum", which is exactly the
+        # false FAIL this layer exists not to produce (R-020). A candidate that optimises the same
+        # expression the wrong way still differs after the flip and is still refuted, unless its
+        # optimum is exactly the negative of the reference's; that coincidence reads as UNDECIDED,
+        # never as PASS, which is the safe direction to be wrong in.
+        mine_min = _minimising(candidate, mine.objective)
+        theirs_min = _minimising(case.reference, theirs.objective)
+        tolerance = 1e-6 * max(1.0, abs(theirs_min))
+        if abs(mine_min - theirs_min) > tolerance:
             return (
                 f"solves to {mine.objective:.6g} where the reference solves to "
                 f"{theirs.objective:.6g}; the same case cannot have two optima, so these are "
@@ -347,3 +356,13 @@ class Sweep:
                 response_excerpt=self._excerpt(completion, verdicts),
             )
         )
+
+
+def _minimising(problem: Problem, value: float) -> float:
+    """An optimal value restated as the value of the equivalent minimisation.
+
+    A problem with no objective has no sense to restate, and its value is returned unchanged.
+    """
+    if problem.objectives and problem.objectives[0].sense is Sense.MAXIMISE:
+        return -value
+    return value

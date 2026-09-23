@@ -1,4 +1,4 @@
-"""Gates for R-017 and R-018: the structural layer must be able to refute."""
+"""Gates for R-017, R-018 and R-020: the structural layer must be able to refute, and only then."""
 
 from __future__ import annotations
 
@@ -146,3 +146,35 @@ def test_a_feasibility_difference_also_refutes(ledger_path) -> None:
     structural = layers.get(Layer.STRUCTURAL.value)
     assert structural["outcome"] == Outcome.FAIL.value, structural
     assert "not" in structural["detail"]
+
+
+def test_a_sense_flipped_rewrite_is_not_refuted(ledger_path) -> None:
+    """R-020.
+
+    Maximising the negative of the cost is the reference's model written the other way round. Its
+    optimum is -900 where the reference's is 900, and comparing those raw values called it "a
+    different optimum": a style rewrite refuted as a wrong model. Read in the minimising sense the
+    two agree, and the layer says UNDECIDED, which is all an agreeing answer can ever earn.
+    """
+    from planteo import DIMENSIONLESS, Constant, Objective, Product, Sense
+
+    from tests.conftest import make_blend
+
+    reference = make_blend()
+    original = reference.objectives[0]
+    flipped = dataclasses.replace(
+        reference,
+        objectives=(
+            Objective(
+                Sense.MAXIMISE,
+                Product((Constant(-1.0, DIMENSIONLESS), original.expression)),
+                name=original.name,
+            ),
+        ),
+    )
+
+    layers = _run(ledger_path, reference, flipped)
+    structural = layers.get(Layer.STRUCTURAL.value)
+    assert structural is not None
+    assert structural["outcome"] == Outcome.UNDECIDED.value, structural
+    assert structural["outcome"] != Outcome.FAIL.value
