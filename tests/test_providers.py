@@ -1,9 +1,12 @@
-"""Gate for R-006: the provider seam does not leak."""
+"""Gates for R-006, the provider seam does not leak, and R-022, a truncation is reported."""
 
 from __future__ import annotations
 
+import io
+import json
 import pathlib
 import re
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,8 +28,14 @@ VENDOR_TOKENS = (
     "gpt-",
     "llama-",
     "api.groq.com",
+    "api.z.ai",
+    "api.deepseek.com",
+    "deepseek-",
+    "glm-",
     "ANTHROPIC_API_KEY",
     "GROQ_API_KEY",
+    "ZAI_API_KEY",
+    "DEEPSEEK_API_KEY",
 )
 
 
@@ -79,7 +88,7 @@ def test_no_provider_name_leaks_outside_the_seam() -> None:
 def test_the_harness_selects_a_provider_by_name() -> None:
     provider = providers.get("stub")
     assert provider.name == "stub"
-    assert set(providers.REGISTRY) >= {"anthropic", "groq", "ollama", "stub"}
+    assert set(providers.REGISTRY) >= {"anthropic", "deepseek", "groq", "ollama", "stub", "zai"}
 
 
 def test_an_unknown_provider_is_refused_with_the_known_list() -> None:
@@ -119,3 +128,76 @@ def test_pricing_is_per_million_tokens() -> None:
     assert pricing.cost(1_000_000, 0) == pytest.approx(3.0)
     assert pricing.cost(0, 1_000_000) == pytest.approx(15.0)
     assert providers.Pricing().cost(10**9, 10**9) == 0.0
+
+
+class _Body(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _replying(body: dict):
+    return lambda request, timeout=None: _Body(json.dumps(body).encode("utf-8"))
+
+
+def _groq_client(reasoning: str) -> SimpleNamespace:
+    """The SDK surface the Groq lane touches, replying with reasoning and no answer."""
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="", reasoning=reasoning), finish_reason="length"
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=900, completion_tokens=8192),
+        model="openai/gpt-oss-120b",
+        system_fingerprint="fp_test",
+    )
+    completions = SimpleNamespace(create=lambda **_: response)
+    return SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+
+def _complete_with_reasoning_only(lane: str, reasoning: str, monkeypatch):
+    if lane == "ollama":
+        body = {
+            "model": "qwen3:8b",
+            "response": "",
+            "thinking": reasoning,
+            "done_reason": "length",
+            "eval_count": 8192,
+        }
+        monkeypatch.setattr("urllib.request.urlopen", _replying(body))
+        return providers.OllamaProvider(host="http://local.test").complete("p", model_id="qwen3:8b")
+    if lane == "groq":
+        provider = providers.GroqProvider(api_key="k")
+        provider._client = _groq_client(reasoning)
+        return provider.complete("p", model_id="openai/gpt-oss-120b")
+    body = {
+        "model": "m",
+        "choices": [
+            {"message": {"content": "", "reasoning_content": reasoning}, "finish_reason": "length"}
+        ],
+        "usage": {"prompt_tokens": 900, "completion_tokens": 8192},
+    }
+    monkeypatch.setattr("urllib.request.urlopen", _replying(body))
+    return providers.REGISTRY[lane](api_key="k").complete("p", model_id="m")
+
+
+@pytest.mark.parametrize("lane", ["ollama", "zai", "deepseek", "groq"])
+def test_reasoning_with_no_answer_is_a_truncation_on_every_lane(lane, monkeypatch) -> None:
+    """R-022: every lane that can reason reports a reasoning-only reply as the truncation it is.
+
+    qwen3.5:4b spent every call on about 3100 characters of reasoning and answered nothing, and an
+    empty string would have recorded a model with nothing to say. The sentence is the same on every
+    lane because a report classifies truncations by it. Anthropic is not a lane here: the provider
+    enables no thinking, so a reply carries no reasoning to report.
+    """
+    completion = _complete_with_reasoning_only(lane, "x" * 3100, monkeypatch)
+
+    assert completion.text.startswith(
+        "[no answer: the model emitted 3100 characters of reasoning and stopped before answering "
+        "(finish_reason length). Raise max_tokens"
+    ), completion.text
+    assert completion.text.endswith("]")
+    assert completion.output_tokens == 8192

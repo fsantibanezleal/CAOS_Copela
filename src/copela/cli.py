@@ -41,7 +41,7 @@ def _cmd_models(args: argparse.Namespace) -> int:
             if pricing.input_per_mtok or pricing.output_per_mtok:
                 cost = f"{pricing.input_per_mtok:g} in / {pricing.output_per_mtok:g} out per MTok"
             else:
-                cost = "no per-token price (local)"
+                cost = "no per-token price"
             print(f"  {model_id:<40} {cost}")
     return 0
 
