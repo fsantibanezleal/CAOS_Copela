@@ -204,9 +204,20 @@ R-024  IF a target's provider has no price for its model, THEN THE sweep SHALL r
 R-025  WHILE a sweep is running, THE budget guard SHALL project each call at its output cap, and SHALL
        NOT project it at a typical output length.
        Gate: tests/test_budget.py::test_the_projection_bounds_a_call_that_fills_its_cap
+
+R-026  WHEN the local lane makes a call, THE provider SHALL request a context that holds the prompt and
+       the whole output cap, and IF the model's window cannot, THEN THE provider SHALL refuse the call.
+       Gate: tests/test_providers.py::test_the_local_lane_sizes_its_context_to_hold_the_cap
+
+R-027  WHERE a local model does not reason, THE provider SHALL NOT send or record a reasoning switch.
+       Gate: tests/test_providers.py::test_a_model_that_does_not_reason_gets_no_reasoning_switch
+
+R-028  WHEN the local lane makes a call, THE completion SHALL carry the digest of the weights behind
+       the tag as part of the model version.
+       Gate: tests/test_providers.py::test_the_local_lane_records_the_weights_it_ran
 ```
 
-R-013 to R-025 were added after the fact, which is worth recording rather than tidying away. The corpus
+R-013 to R-028 were added after the fact, which is worth recording rather than tidying away. The corpus
 contains deliberately contradictory cases, because noticing that a problem has no answer is part of
 what is being measured. The first such case turned the correct verdict into a harness crash, and the
 cause was subtle: the modelling layer copies its own `load_solutions` argument over the config
@@ -259,13 +270,27 @@ it could pass a call it should have refused. And a model missing from a price ta
 zero and then charged at zero, so the budget never moved while the calls were billed; Z.AI's own
 catalogue lists a model its pricing page does not price, so that was one typo away.
 
+R-026 to R-028 came from preparing the first sweep of a local fleet, and R-026 is the one that
+matters. The local lane never set a context, so the server chose one from the GPU's memory, 4096
+tokens on an 8 GB card, whatever `max_tokens` said. A generation that outgrows the window is not
+stopped: the server shifts the context and the model goes on writing with the start of its prompt
+gone. Measured on qwen3:4b and the first corpus case, the default window gave 942 prompt tokens and
+6109 generated, finishing "stop" with an answer a fifth the length of a formalization; a window that
+held the cap gave all 8192 tokens of reasoning and no answer. The two are different measurements,
+and only the second is the one the protocol states. The local lane's earlier result, about 3100
+tokens of reasoning and no answer per call on qwen3.5:4b, ran in the default window, so it says
+nothing about the cap it was blamed on. R-027 came from the same preparation: the server accepts a
+reasoning switch on a model with no reasoning and ignores it, so recording `think=False` there
+claimed a control that did not exist. R-028 because a tag is a name that can be re-pulled onto
+other weights, and the ledger kept only the name.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 
 | Requirement | Result |
 |---|---|
-| R-001 to R-025 | all pass, no skips (0.03.000) |
+| R-001 to R-028 | all pass, no skips (0.03.001) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
