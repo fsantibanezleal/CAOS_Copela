@@ -300,6 +300,10 @@ R-043  WHEN the property layer raises a stated number, THE layer SHALL raise eve
 R-044  IF the provider answers that the model or the endpoint does not exist, THEN THE sweep SHALL
        treat the call as one that never reached a model: it SHALL stop and SHALL NOT record it.
        Gate: tests/test_unreachable.py::test_a_local_model_that_is_not_there_is_unreachable
+
+R-045  THE harness SHALL score a recorded candidate document with the layers a sweep applies, without
+       a call, and the verdicts SHALL equal those the sweep stored when the rules have not changed.
+       Gate: tests/test_rescore.py::test_a_recorded_candidate_scores_to_its_stored_verdicts
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -442,6 +446,11 @@ the model's failures before the chain stopped. A model that is not there answere
 rows were moved out of the ledger into a discard file, and a 404 now stops a sweep like a refused
 connection does, from a local server, an HTTP provider or an SDK's NotFoundError.
 
+R-045 is what R-034 was for. The ledger keeps each candidate's document so that a check written after
+the call can be applied to it, and the scoring a sweep applies was a private method. It is now
+`Sweep.score`, and Enunciado uses it to rescore a recorded measurement under a new release and report
+every verdict the release would change before deciding whether to use it.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -453,6 +462,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | R-001 to R-042 | all pass, no skips (0.08.000); nine mutations of the dynamics layers, nine caught |
 | R-001 to R-043 | all pass, no skips (0.08.001); twelve mutations of the dynamics layers, twelve caught |
 | R-001 to R-044 | all pass, no skips (0.08.002); three mutations of the 404 rule, three caught |
+| R-001 to R-045 | all pass, no skips (0.09.000) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
