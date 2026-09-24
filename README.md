@@ -120,7 +120,9 @@ and the sweep scores it with layers of its own, integrating with SciPy's LSODA:
 
 The structural layer is the one execution accuracy lacks. A mixing tank asked "how much salt after
 20 minutes" has the answer 26.021 kg; a candidate that holds 26.021 kg from the start gives that
-answer and is a different model, refuted at t = 0. The design, with its equations and limits:
+answer and is a different model, refuted at t = 0. From 0.8.0 the comparison is made in SI when both
+documents' unit symbols can be read, so a candidate counting hours or grams where the reference
+counts minutes or kilograms is compared rather than skipped. The design, with its equations and limits:
 [`docs/architecture/03_dynamics.md`](docs/architecture/03_dynamics.md).
 
 ## Install
@@ -218,7 +220,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its forty-one requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its forty-two requirements names the test
 that verifies it.
 
 ## Related

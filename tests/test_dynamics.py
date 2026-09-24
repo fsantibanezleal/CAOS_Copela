@@ -221,3 +221,66 @@ def test_a_reply_of_the_wrong_family_does_not_run(ledger_path) -> None:
     record = _sweep_one(ledger_path, wrong, tank())
     assert [v["outcome"] for v in record.verdicts] == ["fail"], record.verdicts
     assert "family is optimization" in record.verdicts[0]["detail"]
+
+
+def _restated(**changes) -> tuple[Quantity, ...]:
+    """The tank's quantities with some restated: name to (unit symbol, value)."""
+    out = []
+    for q in QUANTITIES:
+        if q.name in changes:
+            symbol, value = changes[q.name]
+            dimension = Dimension(q.dimension.exponents, symbol=symbol)
+            if q.role is Role.INDEPENDENT:
+                q = dataclasses.replace(q, dimension=dimension, upper=value)
+            else:
+                q = dataclasses.replace(q, dimension=dimension, value=value)
+        out.append(q)
+    return tuple(out)
+
+
+def test_a_candidate_in_other_units_is_compared_in_si() -> None:
+    """R-042: counting time in hours, or salt in grams, is the same system. Both are paired with
+    the reference's question and agree along the whole range, so the structural layer cannot refute
+    them and the property layer passes them."""
+    reference = tank()
+    reference_run = run(reference)
+    in_hours = tank(
+        quantities=_restated(t=("h", 0.5), q=("L/h", 300.0)),
+        queries=(Query(Ref("x"), 1 / 3, name="salt_after_20_min"),),
+    )
+    in_grams = tank(quantities=_restated(x=("g", 2000.0), c_in=("g/L", 400.0)))
+    for candidate in (in_hours, in_grams):
+        candidate_run = run(candidate)
+        result = dynamics.structural(candidate, reference, candidate_run, reference_run)
+        assert result.outcome is Outcome.UNDECIDED and "agree" in result.detail, result.detail
+        result = dynamics.provenance(candidate, reference, candidate_run, reference_run)
+        assert result.outcome is Outcome.PASS, result.detail
+
+
+def test_a_conversion_left_undone_is_refuted_in_si() -> None:
+    """R-042: hours on the clock with the flow still at 5 per hour is a tank sixty times slower."""
+    reference = tank()
+    slow = tank(
+        quantities=_restated(t=("h", 0.5), q=("L/h", 5.0)),
+        queries=(Query(Ref("x"), 1 / 3, name="salt_after_20_min"),),
+    )
+    result = dynamics.structural(slow, reference, run(slow), run(reference))
+    assert result.outcome is Outcome.FAIL and "in the reference's units" in result.detail, result.detail
+
+
+def test_a_clock_that_cannot_be_read_is_compared_raw() -> None:
+    """R-042: a symbol outside the vocabulary never converts; the raw times are compared as before,
+    so a question asked at 20 of an unknown unit is paired with the reference's 20 minutes."""
+    reference = tank()
+    # Another form (the inflow named), so the verdict comes from pairing the trajectories rather than
+    # from the canonical form, which ignores unit symbols.
+    unknown = tank(
+        quantities=(*_restated(t=("ticks", 30.0)), Quantity("inflow", Role.DERIVED, KG_PER_MIN)),
+        relations=(
+            Compare(Ref("inflow"), Comparator.EQ, INFLOW),
+            Rate("x", "t", Sum((Ref("inflow"), outflow()))),
+        ),
+    )
+    result = dynamics.structural(unknown, reference, run(unknown), run(reference))
+    assert result.outcome is Outcome.UNDECIDED and "agree" in result.detail, result.detail
+    assert dynamics.provenance(unknown, reference, run(unknown), run(reference)).outcome is Outcome.PASS
