@@ -6,7 +6,9 @@ git tag and any interface string, and the semver form with zeros dropped in `pyp
 
 ## [0.04.001] - 2026-09-23
 
-Documentation only; no code changes.
+Documentation only; no code changes to the library. CI now also checks that `VERSION`, the manifest
+and `__version__` agree, because the first cut of this release bumped the last two and not the first,
+and only the publish workflow noticed.
 
 ### Changed
 
