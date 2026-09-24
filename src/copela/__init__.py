@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from .budget import Budget, BudgetExceeded, UnpricedModel, estimate
 from .ledger import CallKey, Ledger, LedgerError, Record
-from .providers import Provider, ProviderError, StubProvider
+from .providers import Provider, ProviderError, ProviderUnreachable, StubProvider
 from .report import Cell, Report, build
 from .sweep import Case, Sweep, Target
 from .verdicts import (
@@ -30,7 +30,7 @@ from .verdicts import (
     Rate,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 __display_version__ = "0.04.000"
 
 __all__ = [
@@ -48,6 +48,7 @@ __all__ = [
     "Outcome",
     "Provider",
     "ProviderError",
+    "ProviderUnreachable",
     "Rate",
     "Record",
     "Report",
