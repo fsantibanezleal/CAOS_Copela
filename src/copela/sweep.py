@@ -188,7 +188,7 @@ class Sweep:
             error = str(failure)
 
         if candidate is not None:
-            verdicts.extend(self._score(candidate, case))
+            verdicts.extend(self.score(candidate, case))
 
         self._record(key, case, target, completion, verdicts, error, candidate)
         self.budget.charge(
@@ -198,7 +198,16 @@ class Sweep:
             ),
         )
 
-    def _score(self, candidate: Problem, case: Case) -> list[LayerResult]:
+    def score(self, candidate: Problem, case: Case) -> list[LayerResult]:
+        """The layers a sweep applies to one candidate, without a call (R-045).
+
+        A record carries the candidate's document (R-034) so that a check written after the call
+        can be applied to it; this is how. ``Problem.from_json(record.candidate)`` and the record's
+        case, scored with the installed copela and planteo, give that record's verdicts under the
+        current rules, and comparing them with the stored ones shows what a release changes on a
+        measurement that is already recorded. Only ``solve`` is read; no provider is called and the
+        ledger is not touched.
+        """
         results: list[LayerResult] = []
 
         report = validate(candidate)
