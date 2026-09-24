@@ -208,6 +208,13 @@ that scored it and the output cap it ran at. A record is never edited, because a
 rewritten is not evidence. It is also the resume mechanism: a sweep
 reads it and skips the calls already done.
 
+Each record keeps the candidate's document whole, so a later release can be applied to a finished
+measurement without calling a model again:
+
+```python
+again = sweep.score(Problem.from_json(record.candidate), case)   # the verdicts under this release
+```
+
 ## Cost
 
 Every sweep declares a budget and a kill criterion before it runs, and the guard refuses the call
@@ -220,7 +227,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its forty-four requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its forty-five requirements names the test
 that verifies it.
 
 ## Related
