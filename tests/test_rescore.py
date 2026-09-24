@@ -28,7 +28,6 @@ from planteo import (  # noqa: E402
     Ref,
     Role,
     Span,
-    Sum,
 )
 
 from copela import Budget, Case, Ledger, StubProvider, Sweep, Target  # noqa: E402
