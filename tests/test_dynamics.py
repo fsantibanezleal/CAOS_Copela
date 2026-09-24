@@ -284,3 +284,86 @@ def test_a_clock_that_cannot_be_read_is_compared_raw() -> None:
     result = dynamics.structural(unknown, reference, run(unknown), run(reference))
     assert result.outcome is Outcome.UNDECIDED and "agree" in result.detail, result.detail
     assert dynamics.provenance(unknown, reference, run(unknown), run(reference)).outcome is Outcome.PASS
+
+
+def test_a_stated_number_raises_every_quantity_it_produced() -> None:
+    """R-043: "1 mol/L of A" is A's initial value and, written by conservation, the total too. Raising
+    the number raises both; raising only the first would make a correct formalization respond the
+    other way, 1 - 1.05 a against 1.05 (1 - a)."""
+    words = Narrative("A turns into B at a rate of 2 per second, starting from 1 mol/L of A. How much B after 1 s?")
+    molar = Dimension.of("mol/L", amount=1, length=-3)
+    common = (
+        Quantity("t", Role.INDEPENDENT, Dimension.of("s", time=1), lower=0.0, upper=1.0),
+        Quantity("a", Role.STATE, molar, value=1.0, span=Span.find(words, "1 mol/L of A")),
+        Quantity("k", Role.PARAMETER, Dimension.of("1/s", time=-1), value=2.0, span=Span.find(words, "2 per second")),
+    )
+    decay = Rate("a", "t", Product((Constant(-1.0, NONE), Ref("k"), Ref("a"))))
+    reference = Problem(
+        narrative=words,
+        family=Family.DYNAMICS,
+        quantities=(*common, Quantity("b", Role.STATE, molar, value=0.0, span=Span.inferred("none at the start"))),
+        relations=(decay, Rate("b", "t", Product((Ref("k"), Ref("a"))))),
+        queries=(Query(Ref("b"), 1.0, name="b_after_1_s"),),
+    )
+    conserved = Problem(
+        narrative=words,
+        family=Family.DYNAMICS,
+        quantities=(
+            *common,
+            Quantity("a0", Role.PARAMETER, molar, value=1.0, span=Span.find(words, "1 mol/L of A")),
+            Quantity("b", Role.DERIVED, molar),
+        ),
+        relations=(decay, Compare(Ref("b"), Comparator.EQ, Sum((Ref("a0"), Product((Constant(-1.0, NONE), Ref("a"))))))),
+        queries=(Query(Ref("b"), 1.0, name="b_after_1_s"),),
+    )
+    result = dynamics.provenance(conserved, reference, run(conserved), run(reference))
+    assert result.outcome is Outcome.PASS and result.detail.startswith("2 response"), result.detail
+
+
+def _reservoir(words: Narrative, rain_span: str, pump_span: str) -> Problem:
+    flow = Dimension.of("m3/h", length=3, time=-1)
+    return Problem(
+        narrative=words,
+        family=Family.DYNAMICS,
+        quantities=(
+            Quantity("t", Role.INDEPENDENT, Dimension.of("h", time=1), lower=0.0, upper=24.0),
+            Quantity("V", Role.STATE, Dimension.of("m3", length=3), value=5000.0,
+                     span=Span.find(words, "5000 cubic metres")),
+            Quantity("rain", Role.PARAMETER, flow, value=120.0, span=Span.find(words, rain_span)),
+            Quantity("pump", Role.PARAMETER, flow, value=200.0, span=Span.find(words, pump_span)),
+        ),
+        relations=(Rate("V", "t", Sum((Ref("rain"), Product((Constant(-1.0, NONE), Ref("pump")))))),),
+        queries=(Query(Ref("V"), 24.0, name="water_after_24_h"),),
+    )
+
+
+RESERVOIR = Narrative(
+    "A reservoir holds 5000 cubic metres. Rain adds 120 cubic metres per hour, and a pump removes "
+    "200. How much water is there after 24 hours?"
+)
+
+
+def test_a_quantity_covering_two_numbers_is_raised_with_neither() -> None:
+    """R-043: the pump's rate cites everything from "120" to "200", covering both numbers whole. It
+    belongs to neither, so two stated numbers are compared, not three. Given to the first of the two
+    it would be raised with the rain, draining the reservoir where the rain fills it."""
+    reference = _reservoir(RESERVOIR, "120", "200")
+    candidate = _reservoir(RESERVOIR, "120", "120 cubic metres per hour, and a pump removes 200")
+    result = dynamics.provenance(candidate, reference, run(candidate), run(reference))
+    assert result.outcome is Outcome.PASS and result.detail.startswith("2 response"), result.detail
+
+
+def test_a_quantity_belongs_to_the_number_whose_words_it_covers() -> None:
+    """R-043: the pump's rate cites "hour, and a pump removes 200". It shares four characters with
+    the rain's words and three with the pump's, but it covers all of the pump's and a ninth of the
+    rain's, so it is the pump. Raised with the rain it would drain the reservoir where the rain fills
+    it, and a correct formalization would read as refuted."""
+    words = Narrative(
+        "A reservoir holds 5000 cubic metres. Rain adds 120 cubic metres per hour, and a pump removes "
+        "200. How much water is there after 24 hours?"
+    )
+    rain = "Rain adds 120 cubic metres per hour"
+    reference = _reservoir(words, rain, "200")
+    candidate = _reservoir(words, rain, "hour, and a pump removes 200")
+    result = dynamics.provenance(candidate, reference, run(candidate), run(reference))
+    assert result.outcome is Outcome.PASS and result.detail.startswith("3 response"), result.detail

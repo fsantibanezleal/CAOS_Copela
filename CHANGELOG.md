@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.08.001] - 2026-09-24
+
+### Fixed
+
+- **The property layer refuted correct dynamics formalizations (R-043).** It raised one quantity per
+  stated number, and matched a candidate quantity to the first reference quantity whose span
+  overlapped its own. A number that produces two quantities, such as an initial concentration that
+  is also the total in a formalization by conservation, was half raised, and the candidate responded
+  the other way; a candidate quantity was paired with a state that happened to share words with it.
+  A stated number now raises every quantity whose words it is, in both documents, and a candidate
+  quantity belongs to the number whose words it covers the largest fraction of, or to none when it
+  covers two equally. Found by Enunciado's hand-written alternatives of its dynamics cases.
+
 ## [0.08.000] - 2026-09-24
 
 ### Added
