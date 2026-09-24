@@ -241,16 +241,57 @@ def test_a_sweep_records_its_harness_and_its_cap(ledger_path) -> None:
     sweep.run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
 
     written = json.loads(ledger_path.read_text(encoding="utf-8").strip())
-    assert written["schema"] == "copela-ledger/1.1"
+    assert written["schema"] == "copela-ledger/1.2"
     assert written["harness"] == f"copela {copela.__version__}"
     assert written["max_tokens"] == 4321
+
+
+def test_a_sweep_records_the_candidate_document(ledger_path, blend) -> None:
+    """R-034: a response that parses is recorded with its document, whole, and the document loads
+    back into the same problem; one that does not parse is recorded with none.
+
+    No solver is configured, so the gate runs where the solvers extra is not installed: the
+    document is kept because the response parsed, not because anything ran.
+    """
+    from planteo import Problem, compare
+
+    from copela import Budget, Case, StubProvider, Sweep, Target
+
+    replies = {"parses": json.dumps(blend.to_json()), "does not": "I cannot formalize this."}
+    for name, reply in replies.items():
+        ledger = Ledger(ledger_path.with_name(f"{name}.jsonl"))
+        Sweep(
+            ledger=ledger,
+            budget=Budget(limit_usd=1.0),
+            providers={"stub": StubProvider(default=reply)},
+            build_prompt=lambda case: "formalize this",
+            parse_response=lambda text, case: Problem.from_json(json.loads(text)),
+            repeats=1,
+        ).run([Case("c1", "optimization", "n")], [Target("stub", "stub-small")])
+        (record,) = Ledger(ledger.path).records()
+        if name == "parses":
+            assert record.candidate == blend.to_json()
+            assert compare(blend, Problem.from_json(record.candidate)).equivalent
+        else:
+            assert record.candidate is None
+
+
+def test_a_record_written_before_schema_1_2_loads_with_no_document(ledger_path) -> None:
+    """A 1.1 record has no candidate field; it loads with None, which reads as not recorded."""
+    old = make_record().to_json()
+    old["schema"] = "copela-ledger/1.1"
+    del old["candidate"]
+    ledger_path.write_text(json.dumps(old) + "\n", encoding="utf-8")
+
+    (record,) = Ledger(ledger_path).records()
+    assert record.candidate is None
 
 
 def test_a_record_written_before_schema_1_1_still_loads(ledger_path) -> None:
     """A 1.0 record has neither field; it loads with both empty, which reads as unknown."""
     old = make_record().to_json()
     old["schema"] = "copela-ledger/1.0"
-    del old["harness"], old["max_tokens"]
+    del old["harness"], old["max_tokens"], old["candidate"]
     ledger_path.write_text(json.dumps(old) + "\n", encoding="utf-8")
 
     (record,) = Ledger(ledger_path).records()
