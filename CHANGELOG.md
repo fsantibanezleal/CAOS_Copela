@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.08.002] - 2026-09-24
+
+### Fixed
+
+- **A model that is not there no longer fails as the model (R-044).** An HTTP 404, "model not
+  found", now stops a sweep without recording the call, as a refused connection does: from a local
+  Ollama server, from an OpenAI-compatible provider, and as an SDK's `NotFoundError`. The drive that
+  held a local model store went offline mid-sweep, the server kept answering 404, and nine calls
+  were recorded as a model's failures.
+
 ## [0.08.001] - 2026-09-24
 
 ### Fixed
