@@ -290,6 +290,12 @@ R-042  WHEN both documents' unit symbols can be read, THE dynamics layers SHALL 
        as a dimension other than the one declared, THEN THE layers SHALL compare the raw values and
        SHALL NOT convert.
        Gate: tests/test_dynamics.py::test_a_candidate_in_other_units_is_compared_in_si
+
+R-043  WHEN the property layer raises a stated number, THE layer SHALL raise every quantity in either
+       document that cites its words, SHALL assign a candidate quantity to the number whose words it
+       covers the largest fraction of, and SHALL raise a quantity covering two numbers equally with
+       neither.
+       Gate: tests/test_dynamics.py::test_a_stated_number_raises_every_quantity_it_produced
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -417,6 +423,14 @@ never compared: the structural layer abstained, the property layer did not apply
 candidate could not be found faithful. That would have put correct answers into the gap. The same
 held for a candidate reporting grams where the reference reports kilograms, which was refuted.
 
+R-043 came from the same corpus, one step later. Each of its cases carries its reference written a
+second way by hand, and the property layer refuted two correct ones. In the first, "1 mol/L of A"
+was A's initial value and, by conservation, the total, and raising only the first made C fall where
+the reference's rose. In the second, a candidate quantity was matched to the first reference
+quantity whose span overlapped its own, which was a state with no salt in it. A stated number now
+raises everything its words produced, in both documents, and a candidate quantity goes with the words
+it covers most, or with none.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -426,6 +440,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | R-001 to R-033 | all pass, no skips (0.04.000) |
 | R-001 to R-041 | all pass, no skips (0.07.000); each dynamics gate mutation-checked (six mutations, six caught) |
 | R-001 to R-042 | all pass, no skips (0.08.000); nine mutations of the dynamics layers, nine caught |
+| R-001 to R-043 | all pass, no skips (0.08.001); twelve mutations of the dynamics layers, twelve caught |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
