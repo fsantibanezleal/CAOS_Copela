@@ -165,7 +165,7 @@ class Sweep:
             verdicts.append(
                 LayerResult(Layer.EXECUTABLE, Outcome.FAIL, f"the call failed: {error}")
             )
-            self._record(key, case, target, None, verdicts, error)
+            self._record(key, case, target, None, verdicts, error, None)
             self.budget.charge(0.0, failed=True)
             return
 
@@ -185,7 +185,7 @@ class Sweep:
         if candidate is not None:
             verdicts.extend(self._score(candidate, case))
 
-        self._record(key, case, target, completion, verdicts, error)
+        self._record(key, case, target, completion, verdicts, error, candidate)
         self.budget.charge(
             completion.cost_usd,
             failed=any(
@@ -403,9 +403,14 @@ class Sweep:
         completion,
         verdicts: list[LayerResult],
         error: str,
+        candidate: Problem | None,
     ) -> None:
         # Imported here, not at module level: the package imports this module while initialising.
         from . import __version__
+
+        # The document the verdicts were reached on (R-034). A parser may hand back something that
+        # is not a Problem, as a test double does; that is recorded as no document, never guessed.
+        document = candidate.to_json() if isinstance(candidate, Problem) else None
 
         self.ledger.append(
             Record(
@@ -426,6 +431,7 @@ class Sweep:
                 response_excerpt=self._excerpt(completion, verdicts),
                 harness=f"copela {__version__}",
                 max_tokens=self.max_tokens,
+                candidate=document,
             )
         )
 
