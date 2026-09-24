@@ -2,7 +2,7 @@
 
 | Theme | What it covers |
 |---|---|
-| [`design/`](design/) | The software design document, written before the code. Forty-three requirements, each naming its test. |
+| [`design/`](design/) | The software design document, written before the code. Forty-four requirements, each naming its test. |
 | [`architecture/`](architecture/) | The four layers, the property relations, the dynamics layers, and why each is shaped that way. |
 | [`guides/`](guides/) | How to run a sweep, and how to add a property relation. |
 

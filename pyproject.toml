@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "copela"
-version = "0.8.1"
+version = "0.8.2"
 description = "Run narrative-to-formal translation across many language models and score it with oracles that are not language models: executable, structural and property layers, reported separately."
 readme = "README.md"
 requires-python = ">=3.11"
