@@ -241,6 +241,10 @@ R-033  WHEN a sweep records a call, THE record SHALL carry the copela version th
 R-034  WHEN a response parses into a problem, THE record SHALL carry the problem's document whole, and
        SHALL carry none for a response that did not parse.
        Gate: tests/test_ledger.py::test_a_sweep_records_the_candidate_document
+
+R-035  IF a call does not reach the provider, or the provider refuses the credentials, THEN THE sweep
+       SHALL stop, SHALL NOT record that call, and SHALL keep every call recorded before it.
+       Gate: tests/test_unreachable.py::test_a_call_that_never_reached_the_provider_stops_the_sweep_and_records_nothing
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -336,6 +340,14 @@ no way to apply a stronger check to them later, and two refutations turned out t
 counted in whole units against a continuous reference, which could be established only because the
 excerpts of those failures happened to keep the declarations. A record now carries the document the
 verdicts were reached on.
+
+R-035 came from the same second repeat, twice in one morning. First a launcher passed a key file
+whole as the key, and every call raised on an illegal header before it left the machine: the sweep
+recorded nineteen "call failed" rows against Haiku 4.5, rows about a file presented as rows about a
+model, before it was stopped and the rows were discarded. Then the network dropped mid-sweep, and a
+reasoning model's calls, minutes apart, would have been recorded the same way until the kill
+criterion. A provider's answer, including an HTTP 500, is still recorded; a call that got no answer
+about the model, or a refusal of the key, now stops the sweep instead.
 
 ## 10. Convergence
 

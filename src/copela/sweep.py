@@ -21,7 +21,7 @@ from planteo import Problem, Sense, validate
 from .budget import Budget, BudgetExceeded, UnpricedModel, estimate
 from .ledger import CallKey, Ledger, Record, digest
 from .oracles import properties
-from .providers import Pricing, Provider, ProviderError
+from .providers import Pricing, Provider, ProviderError, ProviderUnreachable
 from .verdicts import Layer, LayerResult, Outcome
 
 
@@ -155,6 +155,11 @@ class Sweep:
                 seed=self.seed,
                 max_tokens=self.max_tokens,
             )
+        except ProviderUnreachable:
+            # The call never reached the model. Recording it would put a row about the network or
+            # a key into the ledger as a row about the model, so the sweep stops here, having
+            # recorded every call before this one, and a resume picks up at this call (R-035).
+            raise
         except ProviderError as failure:
             error = str(failure)
 
