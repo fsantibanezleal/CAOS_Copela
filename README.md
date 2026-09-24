@@ -15,15 +15,37 @@ the job here, separating a formalization that is faithful from one that merely r
 gap report
 ============================================================
 
+  ollama/gemma3:12b [optimization]  ran 0.158 [0.055, 0.376] over n=19  faithful 0.000 [0.000, 0.168] over n=19  gap +0.158  (1 unmeasured, the solver could not express them)
+  ollama/deepseek-r1:8b [optimization]  ran 0.200 [0.081, 0.416] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.100
+  ollama/qwen3:14b [optimization]  ran 0.200 [0.081, 0.416] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.100
+  ollama/phi4:latest [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.250 [0.112, 0.469] over n=20  gap +0.100
   anthropic/claude-sonnet-5 [optimization]  ran 0.550 [0.342, 0.742] over n=20  faithful 0.500 [0.299, 0.701] over n=20  gap +0.050
   anthropic/claude-haiku-4-5 [optimization]  ran 0.250 [0.112, 0.469] over n=20  faithful 0.200 [0.081, 0.416] over n=20  gap +0.050
+  deepseek/deepseek-v4-pro [optimization]  ran 0.100 [0.028, 0.301] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.000
+  ollama/qwen2.5-coder:7b [optimization]  ran 0.050 [0.009, 0.236] over n=20  faithful 0.050 [0.009, 0.236] over n=20  gap +0.000
+  zai/glm-4.5-flash [optimization]  ran 0.050 [0.009, 0.236] over n=20  faithful 0.050 [0.009, 0.236] over n=20  gap +0.000
+  zai/glm-5.3 [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.350 [0.181, 0.567] over n=20  gap +0.000
+  ollama/gemma3:4b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/llama3.1:8b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/mistral:7b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/phi4-mini:latest [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/qwen3:4b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/qwen3:8b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
 ```
 
 That is the published measurement, re-derived by this release from its committed ledger with
-`copela report`: twenty authored optimization cases, two models, one repeat each, forty calls,
-1.23 USD, measured 2026-09-22 ([Enunciado](https://enunciado.fasl-work.com/benchmark)). **ran**
-is what the field reports. **faithful** is what was asked for. The gap between them is the
-output, and no source found reports it across target families.
+`copela report`: twenty authored optimization cases, sixteen models from four providers (Anthropic,
+Z.AI, DeepSeek, and eleven open-weight models on one 8 GB GPU through Ollama), one repeat each, 320
+calls, 2.53 USD at list price, measured 2026-09-22 to 2026-09-24
+([Enunciado](https://enunciado.fasl-work.com/benchmark)). **ran** is what the field reports.
+**faithful** is what was asked for. The gap between them is the output, and no source found reports
+it across target families.
+
+Read the gaps with what they rest on. Both Claude gaps are one refutation each, and both refuted
+candidates count shifts, and pumps and valves, in whole units, landing exactly on the reference's
+optimum with its decisions made integer, in statements that never say whether those decisions are
+whole numbers. A refutation against a reference inherits every choice the reference made. Enunciado
+classes such refutations apart and publishes each gap with them read as allowed: 0.000 for both.
 
 An earlier README showed a Haiku 4.5 pass over the same corpus at ran 0.350 and gap +0.100. That
 run was real and is superseded: Enunciado keeps it as the ledger from before an instrument fix,
