@@ -107,11 +107,27 @@ are narrow typed classes, so the relations are written once per class.
 
 A candidate that solves and then fails one of these is wrong in a way no solver would have reported.
 
+## Dynamics
+
+From 0.7.0 a candidate can be a system of ODEs with questions attached (planteo's dynamics family),
+and the sweep scores it with layers of its own, integrating with SciPy's LSODA:
+
+| Layer | A dynamics candidate |
+|---|---|
+| executable | integrates to every question's time with finite values; a system that diverges first fails, and one the instrument cannot finish is unmeasured |
+| structural | equal canonical forms pass; otherwise every question both ask is compared along the **whole range**, and a difference anywhere refutes |
+| property | each number the statement states, raised in both documents, must move the answer the same way |
+
+The structural layer is the one execution accuracy lacks. A mixing tank asked "how much salt after
+20 minutes" has the answer 26.021 kg; a candidate that holds 26.021 kg from the start gives that
+answer and is a different model, refuted at t = 0. The design, with its equations and limits:
+[`docs/architecture/03_dynamics.md`](docs/architecture/03_dynamics.md).
+
 ## Install
 
 ```bash
 pip install copela                    # the harness
-pip install "copela[solvers]"         # plus Pyomo and HiGHS
+pip install "copela[solvers]"         # plus Pyomo, HiGHS and SciPy
 pip install "copela[all]"             # plus the provider SDKs
 ```
 
@@ -202,7 +218,7 @@ refuses to start a sweep of a model it has no price for, because it would count 
 ## Documentation
 
 The wiki is in [`docs/`](docs/). The design document, written before the code, is
-[`docs/design/SDD.md`](docs/design/SDD.md); each of its thirty-three requirements names the test
+[`docs/design/SDD.md`](docs/design/SDD.md); each of its forty-one requirements names the test
 that verifies it.
 
 ## Related

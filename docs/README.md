@@ -2,16 +2,17 @@
 
 | Theme | What it covers |
 |---|---|
-| [`design/`](design/) | The software design document, written before the code. Twelve requirements, each naming its test. |
-| [`architecture/`](architecture/) | The four layers, the ledger, the seam, and why each is shaped that way. |
+| [`design/`](design/) | The software design document, written before the code. Forty-one requirements, each naming its test. |
+| [`architecture/`](architecture/) | The four layers, the property relations, the dynamics layers, and why each is shaped that way. |
 | [`guides/`](guides/) | How to run a sweep, and how to add a property relation. |
 
 ## Where to start
 
 - To run something: [`guides/01_run_a_sweep.md`](guides/01_run_a_sweep.md).
 - To understand the design: [`architecture/01_the_four_layers.md`](architecture/01_the_four_layers.md).
-- To extend it: [`guides/02_add_a_property_relation.md`](guides/02_add_a_property_relation.md) and
-  [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+- To see how a family with no optimum is scored: [`architecture/03_dynamics.md`](architecture/03_dynamics.md).
+- To extend it: [`architecture/02_property_relations.md`](architecture/02_property_relations.md#adding-a-relation-for-a-new-family)
+  and [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## What this is, and is not
 

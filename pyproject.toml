@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "copela"
-version = "0.6.1"
+version = "0.7.0"
 description = "Run narrative-to-formal translation across many language models and score it with oracles that are not language models: executable, structural and property layers, reported separately."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,14 +30,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
-dependencies = ["planteo>=0.1.0"]
+dependencies = ["planteo>=0.2.0"]
 
 [project.optional-dependencies]
-solvers = ["pyomo>=6.7", "highspy>=1.7"]
+solvers = ["pyomo>=6.7", "highspy>=1.7", "scipy>=1.11"]
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.50"]
-all = ["pyomo>=6.7", "highspy>=1.7", "anthropic>=0.40", "openai>=1.50"]
-dev = ["pytest>=8.0", "ruff>=0.6"]
+all = ["pyomo>=6.7", "highspy>=1.7", "scipy>=1.11", "anthropic>=0.40", "openai>=1.50"]
+dev = ["pytest>=8.0", "ruff>=0.6", "scipy>=1.11"]
 
 [project.scripts]
 copela = "copela.cli:main"

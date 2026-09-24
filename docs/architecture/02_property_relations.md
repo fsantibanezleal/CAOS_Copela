@@ -76,8 +76,10 @@ violation, not only a test proving it passes on a correct candidate.
 
 Each family gets its own set, authored once:
 
-- **dynamics**: dimensional consistency, conservation, known limiting cases, invariance under unit
-  change, monotonicity where the physics requires it.
+- **dynamics**: implemented from 0.07.000, differently from this list's first draft. Time
+  rescaling holds for any model by construction and tests nothing, so the relation is derived from
+  provenance: each number cited by both documents is raised in both, and the answer must move the
+  same way. See [`03_dynamics.md`](03_dynamics.md).
 - **experiment design**: a control exists, every hypothesis has a test that can reject it, the metric
   is a function of the stated outcome, the randomisation unit and the analysis unit agree.
 - **learning**: the target is computable from data available at prediction time, the split is
