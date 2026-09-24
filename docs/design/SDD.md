@@ -62,6 +62,14 @@ For optimization, available by construction:
 A formalization that passes layer 1 and fails a property relation is wrong in a way no solver would
 have reported.
 
+For dynamics (R-037 to R-041), the answer is a trajectory. The structural refutation compares every
+question both documents ask along the whole range, not at the asked time alone, and the property
+relation is derived from provenance rather than authored per class: each number the statement
+states and both documents cite is raised by the same factor in both, and a candidate whose answer
+moves the other way is not the system described. Rescaling time, the obvious per-class relation,
+holds for any model by construction and so tests nothing. The design, with its equations and
+limits, is [`../architecture/03_dynamics.md`](../architecture/03_dynamics.md).
+
 ## 5. The provider seam
 
 One interface, several backends: Anthropic and Groq through their SDKs; Z.AI and DeepSeek over
@@ -251,6 +259,31 @@ R-036  THE repository SHALL ship the author-sdd and run-sweep skills, each decla
        ships SHALL refuse before it takes the lock and SHALL stop without recording on a provider it
        cannot reach.
        Gate: tests/test_skills.py::test_the_runner_records_resumes_refuses_and_stops
+
+R-037  WHEN a dynamics candidate validates, THE executable layer SHALL pass it only if its
+       integration reaches every query time with finite values, and SHALL fail it when its rate of
+       change stops being finite before the last query.
+       Gate: tests/test_dynamics.py::test_a_system_that_diverges_before_the_asked_time_does_not_run
+
+R-038  WHEN a dynamics candidate runs and its canonical form differs from the reference's, THE
+       structural layer SHALL compare every question both ask along the whole shared range, SHALL
+       fail the candidate if they differ anywhere beyond the tolerance, including when they agree at
+       the asked time, and SHALL NOT pass it on agreement.
+       Gate: tests/test_dynamics.py::test_the_right_number_at_the_asked_time_is_not_enough
+
+R-039  WHEN a stated number is cited by both the candidate and the reference, THE property layer
+       SHALL raise it by the same factor in both, and SHALL fail the candidate if a shared question
+       does not respond, or responds the other way, where the reference's responds.
+       Gate: tests/test_dynamics.py::test_a_candidate_that_responds_the_wrong_way_to_a_stated_number_is_refuted
+
+R-040  IF the evaluator cannot compute a dynamics candidate, or its integration spends its evaluation
+       budget before the last query, THEN THE executable layer SHALL report it as not measured, and
+       SHALL NOT report it as a failure.
+       Gate: tests/test_dynamics.py::test_what_the_instrument_cannot_compute_is_unmeasured
+
+R-041  WHEN a candidate's family differs from its case reference's, THE executable layer SHALL fail
+       it without scoring it as either family.
+       Gate: tests/test_dynamics.py::test_a_reply_of_the_wrong_family_does_not_run
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -360,6 +393,17 @@ clause this document follows, one to run a sweep the way Enunciado's measurement
 The runner is tested by running it, because a skill's instructions are only as good as the script
 they tell an agent to trust.
 
+R-037 to R-041 are the dynamics family, the plan's second vertical, and R-037's second half came from
+its first test rather than from the design. A candidate whose state runs off to infinity before the
+asked time was expected to fail quickly; LSODA instead reached 1.3e154, where the rate's square
+overflows, and retried that step for over 2.8 million evaluations without returning. A sweep that met
+such a candidate would have hung. The rate of change is now checked at every evaluation, and the
+evaluation count is bounded, with the two outcomes kept apart: a system that diverges before the
+asked time has no answer there, which is the model's failure; an integration that needs more than
+the budget is the instrument's limit, reported as unmeasured as R-040 requires of every such limit.
+R-041 because a sweep that received an optimization problem for a dynamics case would otherwise have
+scored it with the optimization layers against a reference of another kind.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -367,6 +411,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | Requirement | Result |
 |---|---|
 | R-001 to R-033 | all pass, no skips (0.04.000) |
+| R-001 to R-041 | all pass, no skips (0.07.000); each dynamics gate mutation-checked (six mutations, six caught) |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
@@ -380,9 +425,10 @@ measure something:
   list is now read from the registry
 
 Out of scope and therefore not claimed: the judge layer has its label and its exclusion from the
-faithful rate tested, but no judge implementation ships in this release; the dynamics, experiment
-and learning property relations are specified in the docs and not implemented. Neither has
-requirements here, which is the honest state rather than requirements marked pending.
+faithful rate tested, but no judge implementation ships in this release; the experiment and
+learning families are specified in the docs and not implemented. Neither has requirements here,
+which is the honest state rather than requirements marked pending. The dynamics layers ship from
+0.07.000 with R-037 to R-041.
 
 ## 11. Risks and kill criteria
 
