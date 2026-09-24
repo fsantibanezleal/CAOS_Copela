@@ -20,10 +20,11 @@ same small factor and the queries' responses compared: a candidate whose answer 
 when the statement's inflow is raised is not the system described, whatever its value at the asked
 time. The relation is derived from the reference, not authored per case.
 
-Units are the documented limit. Values are compared in each document's own units, so a candidate that
-counts time in hours where the reference counts minutes asks at a different time and is not compared,
-and one that reports grams where the reference reports kilograms is refuted. The corpus's statements
-state the units they ask for.
+**Units.** A candidate may count time in hours where the reference counts minutes, and report grams
+where the reference reports kilograms. When both documents' unit symbols can be read
+(:mod:`copela.units`), questions are paired at the same time in seconds and compared in SI; when
+either cannot, the raw values are compared, as before 0.8.0, so a symbol the vocabulary does not
+know can cost a candidate a comparison but never produces a conversion that is wrong.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from dataclasses import dataclass
 
 from planteo import NotEvaluable, Problem, Role, compare, system
 
+from ..units import Scale, scale
 from ..verdicts import Layer, LayerResult, Outcome
 
 RTOL, ATOL = 1e-9, 1e-12
@@ -69,6 +71,10 @@ class Simulation:
     asks: dict[str, tuple[float, tuple]] = dataclasses.field(default_factory=dict)
     #: A query's value at any time in the range.
     value: Callable[[str, float], float] | None = None
+    #: Seconds per unit of the independent variable, when its symbol can be read.
+    clock: Scale | None = None
+    #: Query name to the scale of its value, when its symbol can be read.
+    units: dict[str, Scale | None] = dataclasses.field(default_factory=dict)
 
 
 def simulate(problem: Problem) -> Simulation:
@@ -79,6 +85,9 @@ def simulate(problem: Problem) -> Simulation:
     built = system(problem)
     scope = problem.scope
     asks = {q.name: (q.at, tuple(q.dimension(scope).exponents)) for q in problem.queries}
+    (independent,) = problem.by_role(Role.INDEPENDENT)
+    clock = scale(independent.dimension)
+    units = {q.name: scale(q.dimension(scope)) for q in problem.queries}
     spent = [0]
 
     def rhs(t: float, y) -> list[float]:
@@ -128,7 +137,7 @@ def simulate(problem: Problem) -> Simulation:
             return Simulation(False, f"{name!r} could not be evaluated at {at:.6g}: {failure}")
         if not math.isfinite(got):
             return Simulation(False, f"{name!r} is not finite at {at:.6g}")
-    return Simulation(True, "integrated to every query time", built.t_span, asks, value)
+    return Simulation(True, "integrated to every query time", built.t_span, asks, value, clock, units)
 
 
 def executable(candidate: Problem) -> tuple[LayerResult, Simulation | None]:
@@ -139,15 +148,35 @@ def executable(candidate: Problem) -> tuple[LayerResult, Simulation | None]:
     return LayerResult(Layer.EXECUTABLE, Outcome.PASS if run.ok else Outcome.FAIL, run.detail), (run if run.ok else None)
 
 
+def _clocks(candidate: Simulation, reference: Simulation) -> tuple[float, float]:
+    """Seconds per unit of each document's independent variable, or 1 and 1 when either symbol
+    cannot be read, which compares the raw times."""
+    if candidate.clock is not None and reference.clock is not None:
+        return candidate.clock.factor, reference.clock.factor
+    return 1.0, 1.0
+
+
 def _pairs(candidate: Simulation, reference: Simulation) -> list[tuple[str, str, float]]:
-    """(candidate query, reference query, asked time) for every question both ask."""
+    """(candidate query, reference query, asked time in the reference's units) for every question
+    both ask: the same time, once both clocks are read into seconds, and the same dimension."""
+    to_c, to_r = _clocks(candidate, reference)
     out = []
     for ref_name, (at, dims) in reference.asks.items():
         for cand_name, (cand_at, cand_dims) in candidate.asks.items():
-            if abs(cand_at - at) <= 1e-9 * max(1.0, abs(at)) and cand_dims == dims:
+            same_time = abs(cand_at * to_c - at * to_r) <= 1e-9 * max(1.0, abs(at * to_r))
+            if same_time and cand_dims == dims:
                 out.append((cand_name, ref_name, at))
                 break
     return out
+
+
+def _in_si(candidate: Simulation, reference: Simulation, cand_name: str, ref_name: str):
+    """Two functions taking each document's value of a paired question to a common unit: SI when
+    both symbols can be read, the raw value when either cannot."""
+    mine, theirs = candidate.units.get(cand_name), reference.units.get(ref_name)
+    if mine is None or theirs is None:
+        return (lambda v: v), (lambda v: v), (lambda v: v)
+    return mine.to_si, theirs.to_si, (lambda v: (v - theirs.offset) / theirs.factor)
 
 
 def _close(a: float, b: float, scale: float) -> bool:
@@ -164,20 +193,24 @@ def structural(candidate: Problem, reference: Problem, cand: Simulation, ref: Si
             Outcome.UNDECIDED,
             "no candidate query asks what the reference asks, at the same time and of the same dimension",
         )
-    low = max(cand.t_span[0], ref.t_span[0])
-    high = min(cand.t_span[1], ref.t_span[1])
+    to_c, to_r = _clocks(cand, ref)
+    # The shared range, in seconds when both clocks can be read.
+    low = max(cand.t_span[0] * to_c, ref.t_span[0] * to_r)
+    high = min(cand.t_span[1] * to_c, ref.t_span[1] * to_r)
     for cand_name, ref_name, at in pairs:
-        times = sorted({low + (high - low) * i / (GRID - 1) for i in range(GRID)} | {at})
-        reference_values = [ref.value(ref_name, t) for t in times]  # type: ignore[misc]
-        scale = max(abs(v) for v in reference_values)
+        mine, theirs, back = _in_si(cand, ref, cand_name, ref_name)
+        times = sorted({low + (high - low) * i / (GRID - 1) for i in range(GRID)} | {at * to_r})
+        reference_values = [theirs(ref.value(ref_name, t / to_r)) for t in times]  # type: ignore[misc]
+        spread = max(abs(v) for v in reference_values)
         for t, expected in zip(times, reference_values, strict=True):
-            got = cand.value(cand_name, t)  # type: ignore[misc]
-            if not _close(got, expected, scale):
+            got = mine(cand.value(cand_name, t / to_c))  # type: ignore[misc]
+            if not _close(got, expected, spread):
                 return LayerResult(
                     Layer.STRUCTURAL,
                     Outcome.FAIL,
-                    f"{ref_name!r} is {got:.6g} at {t:.6g} where the reference's is {expected:.6g}; the same "
-                    "case cannot follow two trajectories, so these are different models",
+                    f"{ref_name!r} is {back(got):.6g} at {t / to_r:.6g} where the reference's is "
+                    f"{back(expected):.6g} (in the reference's units); the same case cannot follow two "
+                    "trajectories, so these are different models",
                 )
     return LayerResult(
         Layer.STRUCTURAL,
@@ -231,10 +264,12 @@ def provenance(candidate: Problem, reference: Problem, cand: Simulation, ref: Si
             continue
         if not (ref_after.ok and cand_after.ok):
             continue
+        to_c, to_r = _clocks(cand, ref)
         for cand_name, ref_name, at in pairs:
-            before_ref, before_cand = ref.value(ref_name, at), cand.value(cand_name, at)  # type: ignore[misc]
+            cand_at = at * to_r / to_c
+            before_ref, before_cand = ref.value(ref_name, at), cand.value(cand_name, cand_at)  # type: ignore[misc]
             moved_ref = ref_after.value(ref_name, at) - before_ref  # type: ignore[misc]
-            moved_cand = cand_after.value(cand_name, at) - before_cand  # type: ignore[misc]
+            moved_cand = cand_after.value(cand_name, cand_at) - before_cand  # type: ignore[misc]
             scale = max(abs(before_ref), 1e-12)
             if abs(moved_ref) <= QUIET * scale:
                 continue
