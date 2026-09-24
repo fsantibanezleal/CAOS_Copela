@@ -245,6 +245,12 @@ R-034  WHEN a response parses into a problem, THE record SHALL carry the problem
 R-035  IF a call does not reach the provider, or the provider refuses the credentials, THEN THE sweep
        SHALL stop, SHALL NOT record that call, and SHALL keep every call recorded before it.
        Gate: tests/test_unreachable.py::test_a_call_that_never_reached_the_provider_stops_the_sweep_and_records_nothing
+
+R-036  THE repository SHALL ship the author-sdd and run-sweep skills, each declaring its name and
+       purpose; the SDD guard the first ships SHALL be the repository's own, and the runner the second
+       ships SHALL refuse before it takes the lock and SHALL stop without recording on a provider it
+       cannot reach.
+       Gate: tests/test_skills.py::test_the_runner_records_resumes_refuses_and_stops
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -348,6 +354,11 @@ model, before it was stopped and the rows were discarded. Then the network dropp
 reasoning model's calls, minutes apart, would have been recorded the same way until the kill
 criterion. A provider's answer, including an HTTP 500, is still recorded; a call that got no answer
 about the model, or a refusal of the key, now stops the sweep instead.
+
+R-036 is the plan's last governance deliverable: two skills, one to author an SDD with the gate
+clause this document follows, one to run a sweep the way Enunciado's measurement ended up being run.
+The runner is tested by running it, because a skill's instructions are only as good as the script
+they tell an agent to trust.
 
 ## 10. Convergence
 
