@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0",
+  "family": "optimization",
+  "narrative": {
+    "text": "A plant blends ore from two pits. Pit A costs 12 USD per tonne and pit B costs 9 USD per tonne. Together they must deliver at least 100 tonnes. Minimise the total cost.",
+    "source": "inline",
+    "language": "en",
+    "digest": "c5f92b007b0c6b4072c3633bcd70807fd729f7690bce41d4f176a732a96b684a"
+  },
+  "quantities": [
+    {
+      "name": "x_a",
+      "role": "variable",
+      "dimension": {
+        "symbol": "t",
+        "exponents": {
+          "mass": "1"
+        }
+      },
+      "domain": "real",
+      "description": "",
+      "lower": 0.0
+    },
+    {
+      "name": "x_b",
+      "role": "variable",
+      "dimension": {
+        "symbol": "t",
+        "exponents": {
+          "mass": "1"
+        }
+      },
+      "domain": "real",
+      "description": "",
+      "lower": 0.0
+    },
+    {
+      "name": "c_a",
+      "role": "parameter",
+      "dimension": {
+        "symbol": "USD/t",
+        "exponents": {
+          "mass": "-1",
+          "currency": "1"
+        }
+      },
+      "domain": "real",
+      "description": "",
+      "value": 12.0
+    },
+    {
+      "name": "c_b",
+      "role": "parameter",
+      "dimension": {
+        "symbol": "USD/t",
+        "exponents": {
+          "mass": "-1",
+          "currency": "1"
+        }
+      },
+      "domain": "real",
+      "description": "",
+      "value": 9.0
+    },
+    {
+      "name": "demand",
+      "role": "parameter",
+      "dimension": {
+        "symbol": "t",
+        "exponents": {
+          "mass": "1"
+        }
+      },
+      "domain": "real",
+      "description": "",
+      "value": 100.0
+    }
+  ],
+  "relations": [
+    {
+      "tag": "compare",
+      "left": {
+        "tag": "sum",
+        "terms": [
+          {
+            "tag": "ref",
+            "name": "x_a"
+          },
+          {
+            "tag": "ref",
+            "name": "x_b"
+          }
+        ]
+      },
+      "comparator": ">=",
+      "right": {
+        "tag": "const",
+        "value": 100.0,
+        "unit": {
+          "symbol": "t",
+          "exponents": {
+            "mass": "1"
+          }
+        }
+      },
+      "name": "meet_demand"
+    }
+  ],
+  "objectives": [
+    {
+      "sense": "minimise",
+      "expression": {
+        "tag": "sum",
+        "terms": [
+          {
+            "tag": "product",
+            "factors": [
+              {
+                "tag": "ref",
+                "name": "c_a"
+              },
+              {
+                "tag": "ref",
+                "name": "x_a"
+              }
+            ]
+          },
+          {
+            "tag": "product",
+            "factors": [
+              {
+                "tag": "ref",
+                "name": "c_b"
+              },
+              {
+                "tag": "ref",
+                "name": "x_b"
+              }
+            ]
+          }
+        ]
+      },
+      "name": "total_cost"
+    }
+  ],
+  "assumptions": [],
+  "open_questions": [],
+  "metadata": {
+    "problem_id": "",
+    "title": "",
+    "formalizer": "",
+    "created": "",
+    "notes": ""
+  },
+  "feasibility_only": false
+}
