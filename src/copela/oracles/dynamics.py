@@ -222,7 +222,8 @@ def structural(candidate: Problem, reference: Problem, cand: Simulation, ref: Si
 
 def _cited(problem: Problem) -> list:
     """The quantities a stated number produced: parameters with a value, and states' initial values,
-    each with the span it cites."""
+    each with the span it cites. An inferred span covers no characters, so it overlaps nothing and
+    is never raised as a stated number."""
     return [
         q
         for q in problem.quantities
@@ -230,25 +231,53 @@ def _cited(problem: Problem) -> list:
     ]
 
 
-def _overlaps(a, b) -> bool:
-    return a.start < b.end and b.start < a.end
+def _overlap(a, b) -> int:
+    """Characters two spans share."""
+    return max(0, min(a.end, b.end) - max(a.start, b.start))
 
 
-def _nudged(problem: Problem, name: str) -> Problem:
+def _stated_numbers(candidate: Problem, reference: Problem) -> list[tuple[str, list[str], list[str]]]:
+    """Each stated number cited by both documents: its words, the reference quantities citing them,
+    and the candidate quantities citing them.
+
+    One stated number can produce several quantities: "1 mol/L of A" is A's initial value and, in a
+    formalization by conservation, the total too. Raising the number raises all of them, or the
+    relation compares a document with half a change against one with the whole of it. Reference
+    quantities whose spans overlap are one number. A candidate quantity belongs to the number whose
+    words it covers the largest fraction of; one that covers two numbers equally, such as a span
+    running over a whole sentence, belongs to neither, and is left out rather than raised with the
+    wrong number.
+    """
+    ref_cited = _cited(reference)
+    groups: list[list] = []
+    for quantity in ref_cited:
+        joined = [g for g in groups if any(_overlap(quantity.span, other.span) for other in g)]
+        merged = [quantity] + [q for g in joined for q in g]
+        groups = [g for g in groups if g not in joined] + [merged]
+    owned: dict[int, list[str]] = {i: [] for i in range(len(groups))}
+    for quantity in _cited(candidate):
+        shares = [max(_overlap(quantity.span, r.span) / max(1, r.span.end - r.span.start) for r in g) for g in groups]
+        best = max(shares, default=0)
+        if best > 0 and shares.count(best) == 1:
+            owned[shares.index(best)].append(quantity.name)
+    out = []
+    for i, group in enumerate(groups):
+        if owned[i]:
+            first = min(group, key=lambda q: q.span.start)
+            out.append((first.span.text, [q.name for q in group], owned[i]))
+    return sorted(out, key=lambda item: reference.narrative.text.find(item[0]))
+
+
+def _nudged(problem: Problem, names: list[str]) -> Problem:
     quantities = tuple(
-        dataclasses.replace(q, value=q.value * NUDGE) if q.name == name else q for q in problem.quantities
+        dataclasses.replace(q, value=q.value * NUDGE) if q.name in names else q for q in problem.quantities
     )
     return dataclasses.replace(problem, quantities=quantities)
 
 
 def provenance(candidate: Problem, reference: Problem, cand: Simulation, ref: Simulation) -> LayerResult:
     pairs = _pairs(cand, ref)
-    matched = []
-    for ref_quantity in _cited(reference):
-        for cand_quantity in _cited(candidate):
-            if _overlaps(ref_quantity.span, cand_quantity.span):
-                matched.append((ref_quantity, cand_quantity))
-                break
+    matched = _stated_numbers(candidate, reference)
     if not pairs or not matched:
         return LayerResult(
             Layer.PROPERTY,
@@ -256,10 +285,10 @@ def provenance(candidate: Problem, reference: Problem, cand: Simulation, ref: Si
             "no number the statement states is cited by both, or no question is asked by both",
         )
     compared = 0
-    for ref_quantity, cand_quantity in matched:
+    for cited, ref_names, cand_names in matched:
         try:
-            ref_after = simulate(_nudged(reference, ref_quantity.name))
-            cand_after = simulate(_nudged(candidate, cand_quantity.name))
+            ref_after = simulate(_nudged(reference, ref_names))
+            cand_after = simulate(_nudged(candidate, cand_names))
         except NotEvaluable:
             continue
         if not (ref_after.ok and cand_after.ok):
@@ -275,7 +304,6 @@ def provenance(candidate: Problem, reference: Problem, cand: Simulation, ref: Si
                 continue
             compared += 1
             if abs(moved_cand) <= QUIET * max(abs(before_cand), 1e-12) or (moved_cand > 0) != (moved_ref > 0):
-                cited = ref_quantity.span.text
                 return LayerResult(
                     Layer.PROPERTY,
                     Outcome.FAIL,
