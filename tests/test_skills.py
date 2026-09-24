@@ -85,7 +85,11 @@ def test_the_runner_records_resumes_refuses_and_stops(tmp_path, monkeypatch) -> 
     assert runner.main([*common, "--budget-usd", "0.05", "--repeats", "2"]) == 0
     records = Ledger(ledger).records()
     assert [r.key.repeat for r in records] == [0, 1]
-    assert all(r.candidate == json.loads(answer) for r in records)
+    # Compared as problems, not as JSON: a document is re-serialised at the installed planteo's
+    # schema, and the same problem written at another version is the same problem.
+    from planteo import Problem
+
+    assert all(Problem.from_json(r.candidate) == Problem.from_json(json.loads(answer)) for r in records)
 
     # A resume makes no call: the ledger already holds both.
     before = ledger.read_text(encoding="utf-8")
