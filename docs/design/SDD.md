@@ -284,6 +284,12 @@ R-040  IF the evaluator cannot compute a dynamics candidate, or its integration 
 R-041  WHEN a candidate's family differs from its case reference's, THE executable layer SHALL fail
        it without scoring it as either family.
        Gate: tests/test_dynamics.py::test_a_reply_of_the_wrong_family_does_not_run
+
+R-042  WHEN both documents' unit symbols can be read, THE dynamics layers SHALL pair questions at the
+       same time in seconds and compare their values in SI; IF either symbol cannot be read, or reads
+       as a dimension other than the one declared, THEN THE layers SHALL compare the raw values and
+       SHALL NOT convert.
+       Gate: tests/test_dynamics.py::test_a_candidate_in_other_units_is_compared_in_si
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -404,6 +410,13 @@ the budget is the instrument's limit, reported as unmeasured as R-040 requires o
 R-041 because a sweep that received an optimization problem for a dynamics case would otherwise have
 scored it with the optimization layers against a reference of another kind.
 
+R-042 came from designing Enunciado's dynamics corpus against 0.07.000. A statement that gives rates
+per minute and asks "after 1 hour" invites two correct formalizations, one counting minutes and one
+counting hours, and the second asked its question at 1 where the reference asked at 60, so it was
+never compared: the structural layer abstained, the property layer did not apply, and a correct
+candidate could not be found faithful. That would have put correct answers into the gap. The same
+held for a candidate reporting grams where the reference reports kilograms, which was refuted.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -412,6 +425,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 |---|---|
 | R-001 to R-033 | all pass, no skips (0.04.000) |
 | R-001 to R-041 | all pass, no skips (0.07.000); each dynamics gate mutation-checked (six mutations, six caught) |
+| R-001 to R-042 | all pass, no skips (0.08.000); nine mutations of the dynamics layers, nine caught |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
