@@ -133,13 +133,30 @@ copela report runs.jsonl
 gap report
 ============================================================
 
+  ollama/gemma3:12b [optimization]  ran 0.158 [0.055, 0.376] over n=19  faithful 0.000 [0.000, 0.168] over n=19  gap +0.158  (1 unmeasured, the solver could not express them)
+  ollama/deepseek-r1:8b [optimization]  ran 0.200 [0.081, 0.416] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.100
+  ollama/qwen3:14b [optimization]  ran 0.200 [0.081, 0.416] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.100
+  ollama/phi4:latest [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.250 [0.112, 0.469] over n=20  gap +0.100
   anthropic/claude-sonnet-5 [optimization]  ran 0.550 [0.342, 0.742] over n=20  faithful 0.500 [0.299, 0.701] over n=20  gap +0.050
   anthropic/claude-haiku-4-5 [optimization]  ran 0.250 [0.112, 0.469] over n=20  faithful 0.200 [0.081, 0.416] over n=20  gap +0.050
+  deepseek/deepseek-v4-pro [optimization]  ran 0.100 [0.028, 0.301] over n=20  faithful 0.100 [0.028, 0.301] over n=20  gap +0.000
+  ollama/qwen2.5-coder:7b [optimization]  ran 0.050 [0.009, 0.236] over n=20  faithful 0.050 [0.009, 0.236] over n=20  gap +0.000
+  zai/glm-4.5-flash [optimization]  ran 0.050 [0.009, 0.236] over n=20  faithful 0.050 [0.009, 0.236] over n=20  gap +0.000
+  zai/glm-5.3 [optimization]  ran 0.350 [0.181, 0.567] over n=20  faithful 0.350 [0.181, 0.567] over n=20  gap +0.000
+  ollama/gemma3:4b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/llama3.1:8b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/mistral:7b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/phi4-mini:latest [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/qwen3:4b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
+  ollama/qwen3:8b [optimization]  ran 0.000 [0.000, 0.161] over n=20  faithful 0.000 [0.000, 0.161] over n=20  gap UNDEFINED, nothing reached the faithfulness layers
 ```
 
-That is real output, from the ledger Enunciado publishes. This guide used to show two invented
-rows (n=50, a local model that was never run) with the intervals elided, which in a tool whose
-subject is unverified numbers is the one thing a guide must not do.
+That is real output, from the ledger Enunciado publishes, in full: sixteen models, sorted by the
+gap. This guide used to show two invented rows (n=50, a local model that was never run) with the
+intervals elided, which in a tool whose subject is unverified numbers is the one thing a guide must
+not do. A row reads `UNDEFINED` when nothing the model wrote ran, because a gap between two rates
+that are both zero says nothing, and `unmeasured` counts the candidates the configured solver could
+not express, which leave both rates rather than counting against the model.
 
 Read the gap, not the ran rate. The ran rate is the number that is already reported everywhere and
 it is the one that overstates.

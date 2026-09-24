@@ -63,11 +63,23 @@ the anchor survey documents.
 frontier measurement it returned `UNDECIDED` on *every single* candidate that ran. The whole
 faithfulness rate therefore rested on internal invariants that had never failed anything, and the
 reported gap was exactly `+0.000`. A rate carried by a check that cannot fail is not a measurement.
-With refutation added, the published measurement (twenty cases, two models, forty calls) holds two
-refutations: a Haiku 4.5 candidate that solves to 16 where its reference solves to 16.667, and a
-Sonnet 5 candidate that solves to 8080 against 8200. Each model's gap is `+0.050`. The layer still
-returned `PASS` on none of the sixteen candidates that ran, so the other fourteen faithful verdicts
-rest on the property layer.
+With refutation added, the first published measurement (twenty cases, two models, forty calls) held
+two refutations: a Haiku 4.5 candidate that solves to 16 where its reference solves to 16.667, and a
+Sonnet 5 candidate that solves to 8080 against 8200, a gap of `+0.050` each, and the layer returned
+`PASS` on none of the sixteen candidates that ran. The finished measurement (sixteen models, 320
+calls) has 45 candidates that ran: the layer passed 4, all from GLM-5.3 and DeepSeek-V4-Pro, which
+reproduced their references' document form, and refuted 10, so 30 of the 34 faithful verdicts rest
+on the property layer alone.
+
+**A refutation inherits the reference's choices.** Both Claude refutations turned out to be the
+same kind. opt-006 asks for the most night shifts a wage bill allows and opt-012 for the best margin
+on pumps and valves; neither statement says whether a shift or a pump is a whole number, and both
+references are continuous. The candidates declared the decisions integer, and 16 and 8080 are
+exactly the references' optima with their decisions made integer. The refutation is true, the two
+are different models, and it is still not evidence that the candidate misread the statement,
+because the statement allowed its reading. This layer cannot see that: it compares against the one
+reference it is given. Enunciado records each reference's whole-number optimum at bake time and
+classes a refutation that lands on it apart, and read as allowed both Claude gaps are `0.000`.
 
 If a case has no reference formalization, this layer reports `NOT_APPLICABLE` instead of inventing
 an opinion.
