@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import Completion, Pricing, Provider, ProviderError, StubProvider
+from .base import Completion, Pricing, Provider, ProviderError, ProviderUnreachable, StubProvider
 from .hosted import (
     AnthropicProvider,
     ChatCompletionsProvider,
@@ -44,6 +44,7 @@ __all__ = [
     "Pricing",
     "Provider",
     "ProviderError",
+    "ProviderUnreachable",
     "StubProvider",
     "ZaiProvider",
     "get",
