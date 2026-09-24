@@ -119,6 +119,12 @@ print(f"{made} call(s), {budget.describe()}")
 Run it again. Calls already in the ledger are skipped, so an interrupted sweep continues where it
 stopped and costs nothing for the work already done.
 
+A sweep also stops by itself when a call cannot reach the provider: a refused connection, a name
+that does not resolve, or a key the provider rejects raises `ProviderUnreachable`, and that call is
+not recorded, because it says nothing about the model. Fix the connection or the key and run it
+again; it picks up at the call that failed. A provider's own error, an HTTP 500, is its answer to
+that call and is recorded like any failure.
+
 ```python
 sweep.run(cases, targets)   # 0 calls if nothing is left
 ```

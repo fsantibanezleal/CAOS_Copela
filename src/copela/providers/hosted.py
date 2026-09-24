@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import time
 
-from .base import Completion, Pricing, Provider, ProviderError
+from .base import Completion, Pricing, Provider, ProviderError, ProviderUnreachable, unreachable
 
 
 def no_answer_text(reasoned_chars: int, finish_reason: object, remedy: str) -> str:
@@ -113,6 +113,8 @@ class AnthropicProvider(Provider):
         try:
             message = client.messages.create(**request)  # type: ignore[arg-type]
         except Exception as error:  # the SDK's exception tree is not ours to depend on
+            if unreachable(error):
+                raise ProviderUnreachable(f"anthropic could not be reached: {error}") from error
             raise ProviderError(f"anthropic call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
 
@@ -200,6 +202,8 @@ class GroqProvider(Provider):
                 seed=seed,
             )
         except Exception as error:
+            if unreachable(error):
+                raise ProviderUnreachable(f"groq could not be reached: {error}") from error
             raise ProviderError(f"groq call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
 
@@ -391,7 +395,11 @@ class OllamaProvider(Provider):
             # The body names the cause ("model not found", out of memory); the status alone does not.
             detail = error.read().decode("utf-8", errors="replace")[:500]
             raise ProviderError(f"ollama call failed: HTTP {error.code}: {detail}") from error
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+        except urllib.error.URLError as error:
+            # No response at all: the server is down or the host is wrong. A read that times out
+            # after connecting is the model taking too long, and stays a recorded failure.
+            raise ProviderUnreachable(f"ollama could not be reached at {self._host}: {error}") from error
+        except (TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"ollama call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
 
@@ -515,8 +523,15 @@ class ChatCompletionsProvider(Provider):
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")[:500]
+            if error.code in (401, 403):
+                # Rejected credentials are the harness failing to ask, not the model answering.
+                raise ProviderUnreachable(
+                    f"{self.name} refused the credentials: HTTP {error.code}: {detail}"
+                ) from error
             raise ProviderError(f"{self.name} call failed: HTTP {error.code}: {detail}") from error
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+        except urllib.error.URLError as error:
+            raise ProviderUnreachable(f"{self.name} could not be reached: {error}") from error
+        except (TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"{self.name} call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
 
