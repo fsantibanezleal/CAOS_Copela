@@ -25,7 +25,7 @@ from copela import (
     Target,
 )
 from copela.providers.base import unreachable
-from copela.providers.hosted import DeepSeekProvider
+from copela.providers.hosted import DeepSeekProvider, OllamaProvider
 
 
 def _cases(n: int) -> list[Case]:
@@ -69,15 +69,15 @@ def test_a_refused_connection_is_unreachable() -> None:
         provider.complete("hello", model_id="deepseek-v4-pro", max_tokens=8)
 
 
-@pytest.mark.parametrize(("status", "unreached"), [(401, True), (403, True), (500, False)])
-def test_rejected_credentials_are_unreachable_and_a_server_error_is_not(status, unreached) -> None:
+def _answering(status: int, body: bytes):
+    """A local server that answers every POST with ``status`` and ``body``."""
+
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802, the stdlib's name
             # Read the request before answering. A server that replies with the body unread and
             # closes makes Windows reset the connection under the client, which the client then
             # (rightly) reports as unreachable: the 500 case failed that way one run in three.
             self.rfile.read(int(self.headers.get("Content-Length", 0)))
-            body = b'{"error": {"message": "no"}}'
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -88,13 +88,33 @@ def test_rejected_credentials_are_unreachable_and_a_server_error_is_not(status, 
             pass
 
     server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+@pytest.mark.parametrize(("status", "unreached"), [(401, True), (403, True), (404, True), (500, False)])
+def test_rejected_credentials_are_unreachable_and_a_server_error_is_not(status, unreached) -> None:
+    """R-035 and R-044: refused credentials and a model that does not exist never reached a model;
+    a server error is the provider's answer to this call."""
+    server = _answering(status, b'{"error": {"message": "no"}}')
     try:
         provider = DeepSeekProvider(api_key="not-a-key", base_url=f"http://127.0.0.1:{server.server_port}", timeout_s=5)
         with pytest.raises(ProviderError) as raised:
             provider.complete("hello", model_id="deepseek-v4-pro", max_tokens=8)
         assert isinstance(raised.value, ProviderUnreachable) is unreached
+    finally:
+        server.shutdown()
+
+
+def test_a_local_model_that_is_not_there_is_unreachable() -> None:
+    """R-044: the drive holding the model store went offline mid-sweep, the server answered every
+    call with 404 "model not found", and nine calls were recorded as the model's failures. A model
+    the server cannot find answered nothing."""
+    server = _answering(404, b"{\"error\":\"model 'deepseek-r1:8b' not found\"}")
+    try:
+        provider = OllamaProvider(host=f"http://127.0.0.1:{server.server_port}", timeout_s=5)
+        with pytest.raises(ProviderUnreachable, match="404"):
+            provider.complete("hello", model_id="deepseek-r1:8b", max_tokens=8)
     finally:
         server.shutdown()
 
@@ -112,6 +132,10 @@ def test_sdk_errors_are_read_by_name_along_the_mro() -> None:
     class RateLimitError(Exception):
         pass
 
+    class NotFoundError(Exception):
+        pass
+
     assert unreachable(APIConnectionError("down"))
     assert unreachable(APITimeoutError("slow to connect"))
+    assert unreachable(NotFoundError("no such model"))
     assert not unreachable(RateLimitError("429"))

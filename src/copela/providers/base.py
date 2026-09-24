@@ -59,21 +59,29 @@ class ProviderError(RuntimeError):
 
 
 class ProviderUnreachable(ProviderError):
-    """The call never reached the model: the connection failed before any response, or the provider
-    refused the credentials. It says nothing about the model, so a sweep stops on it and records
-    nothing (R-035).
+    """The call never reached the model: the connection failed before any response, the provider
+    refused the credentials, or it has no such model. It says nothing about the model, so a sweep
+    stops on it and records nothing (R-035, R-044).
 
-    The distinction is the response. An HTTP 500 is the provider's answer to this call and is
-    recorded like any failure; a connection refused, a name that did not resolve, a TLS failure or a
-    401 is the harness failing to ask. Recording those wrote rows about a network or a key file into
-    an append-only ledger, as rows about the model.
+    The distinction is whether a model answered. An HTTP 500 is the provider's answer to this call
+    and is recorded like any failure; a connection refused, a name that did not resolve, a TLS
+    failure, a 401 or a 404 "model not found" is the harness failing to ask. Recording those wrote
+    rows about a network, a key file and a drive that went offline into an append-only ledger, as
+    rows about the model.
     """
 
 
 #: The exception names, in the SDKs that copela does not depend on, that mean the request never got
 #: an answer about the model: a transport failure, or rejected credentials.
 UNREACHABLE_NAMES = frozenset(
-    {"APIConnectionError", "APITimeoutError", "AuthenticationError", "PermissionDeniedError"}
+    {
+        "APIConnectionError",
+        "APITimeoutError",
+        "AuthenticationError",
+        "PermissionDeniedError",
+        # HTTP 404: the model or the endpoint does not exist where the call was sent (R-044).
+        "NotFoundError",
+    }
 )
 
 
