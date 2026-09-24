@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.08.000] - 2026-09-24
+
+### Added
+
+- **Unit-aware comparison in the dynamics layers (R-042).** `copela.units` reads a unit symbol into a
+  factor to SI: time, length, volume, mass, amount, electrical and mechanical units with the SI
+  prefixes, long and plural forms, products, quotients, powers, parentheses and count nouns, trusted
+  only when the exponents it implies equal the declared ones; Celsius converts with its offset.
+  Questions are paired at the same time in seconds and compared in SI. A symbol that cannot be read
+  is compared raw, as before.
+
+### Fixed
+
+- A correct dynamics candidate in other units could not be found faithful. One counting hours where
+  the reference counts minutes asked its question at 1 where the reference asked at 60 and was never
+  compared; one counting grams where the reference counts kilograms was refuted.
+
 ## [0.07.000] - 2026-09-24
 
 ### Added

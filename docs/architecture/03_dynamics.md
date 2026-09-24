@@ -46,11 +46,35 @@ Two outcomes are not a pass, and they are kept apart because they mean different
   evaluator cannot compute, such as an indexed sum, whose members are not scalar values. Neither
   shows the model is wrong. The corpus's references need a few hundred evaluations.
 
+## Units
+
+planteo compares dimensions as exponent vectors, which is right for a dimensional check: minutes
+and hours are both time. It is not enough for comparing values. A candidate that integrates in hours
+where the reference integrates in minutes asks "after 20 minutes" at $t = 1/3$ where the reference
+asks at $t = 20$, and one that counts salt in grams reports 26021 where the reference reports
+26.021. Both are the system described.
+
+Each unit symbol is therefore read into a factor to SI ([`copela.units`](../../src/copela/units.py)):
+a closed vocabulary of time, length, volume, mass, amount, electrical and mechanical units with the
+SI prefixes, their long and plural forms, products, quotients, powers and parentheses, and count
+nouns ("people", "thousand rabbits"). A reading is trusted only when the exponents it implies equal
+the exponents the document declared, so "min" declared as a length is not read at all. Celsius is
+affine: a value in degrees Celsius converts with an offset, $T_K = T_{C} + 273.15$, and only when
+the symbol is exactly one Celsius token.
+
+With $\kappa^{c}, \kappa^{r}$ the seconds per unit of each document's independent variable and
+$s^{c}, s^{r}$ the SI scales of a question's value, two questions are paired when
+$|\tau^{c}\kappa^{c} - \tau^{r}\kappa^{r}| \le 10^{-9} \max(1, |\tau^{r}\kappa^{r}|)$ and their
+dimensions agree, and every comparison below is made on $t\,\kappa$ and $s(Q)$. When either
+document's symbol cannot be read, the raw times and values are compared, which is what the layers did
+before 0.8.0: a symbol outside the vocabulary can cost a candidate a comparison, but never produces a
+conversion that is wrong.
+
 ## Structural
 
 Equal canonical forms prove equivalence: PASS. Otherwise the refutation compares the questions both
-documents ask (the same time $\tau$, the same dimension) along the **whole shared range**, not only at
-the asked time. On the grid
+documents ask (the same time $\tau$ in seconds, the same dimension) along the **whole shared
+range**, not only at the asked time. With times in seconds and values in SI, on the grid
 
 $$
 T = \Big\{\, t_0 + (t_1 - t_0)\,\tfrac{i}{60} \;:\; i = 0, \dots, 60 \,\Big\} \cup \{\tau\},
@@ -109,10 +133,14 @@ Recorded for comparability, never counted, as for optimization.
 
 ## Limits, stated rather than hidden
 
-- **Units.** Values are compared in each document's own units. A candidate that counts time in
-  hours where the reference counts minutes asks at a different time and is not compared; one that
-  reports grams where the reference reports kilograms is refuted. Enunciado's dynamics statements
-  state the units they ask for.
+- **Units the vocabulary does not know.** A symbol outside it is compared raw, so a candidate
+  that counts time in fortnights is paired only if its numbers happen to match. The vocabulary is
+  closed on purpose: a wrong conversion would refute a correct candidate, and a missing one only
+  leaves it uncompared.
+- **Rounded conversions are different numbers.** A candidate that converts 4 L/min into 0.0667 L/s
+  states a flow 0.05% off, which the structural tolerance refutes. That is correct about the
+  document and harsh about the model, so Enunciado's statements invite only conversions that are
+  exact in decimal (6 L/min is 360 L/h and 0.1 L/s).
 - **The sign is one-sided evidence.** A candidate that responds the right way can still respond by
   the wrong amount; the structural layer, not this one, compares amounts.
 - **A finite perturbation.** A 5% change is not a derivative; a response that changes sign within 5%
