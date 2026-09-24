@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.04.001] - 2026-09-23
+
+Documentation only; no code changes.
+
+### Changed
+
+- The README and the sweep guide show the finished measurement, re-derived by this release with
+  `copela report`: sixteen models from four providers, 320 calls, 2.53 USD at list price. They
+  showed the first, two-model measurement.
+- `docs/architecture/01_the_four_layers.md` states what the structural layer decided over the
+  finished measurement (4 PASS, 10 refutations, 45 candidates that ran) and a limitation it cannot
+  see: a refutation inherits every choice the reference made. Both Claude refutations land exactly
+  on their references' optima with the decisions made integer, in statements that never say whether
+  those decisions are whole numbers.
+
 ## [0.04.000] - 2026-09-23
 
 ### Added
