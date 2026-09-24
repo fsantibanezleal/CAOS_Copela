@@ -59,6 +59,13 @@ That gap is not hypothetical. Where it has been measured carefully, in natural-l
 formalization, it runs [3.0 to 29.0 percentage points](https://arxiv.org/abs/2606.31002), and the
 strongest system measured had the largest gap: 89.5% compiling, 60.5% faithful.
 
+## Skills
+
+Two agent skills ship in [`skills/`](skills/README.md): **author-sdd**, to write a design document in
+which every requirement names the gate that fails when it is violated, and **run-sweep**, to run a
+sweep with every refusal made before anything is spent. Copy a folder into `~/.claude/skills/`, or
+run its scripts directly.
+
 ## Four layers, never merged
 
 | Layer | Asks | Strength |
