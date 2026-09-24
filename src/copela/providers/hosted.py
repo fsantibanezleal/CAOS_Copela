@@ -394,6 +394,10 @@ class OllamaProvider(Provider):
         except urllib.error.HTTPError as error:
             # The body names the cause ("model not found", out of memory); the status alone does not.
             detail = error.read().decode("utf-8", errors="replace")[:500]
+            if error.code == 404:
+                # No model answered: the name is not pulled, or the model store is gone (R-044). A
+                # drive that went offline mid-sweep wrote nine of these against a model.
+                raise ProviderUnreachable(f"ollama has no model to answer: HTTP 404: {detail}") from error
             raise ProviderError(f"ollama call failed: HTTP {error.code}: {detail}") from error
         except urllib.error.URLError as error:
             # No response at all: the server is down or the host is wrong. A read that times out
@@ -528,6 +532,9 @@ class ChatCompletionsProvider(Provider):
                 raise ProviderUnreachable(
                     f"{self.name} refused the credentials: HTTP {error.code}: {detail}"
                 ) from error
+            if error.code == 404:
+                # No such model or endpoint: nothing was asked of a model (R-044).
+                raise ProviderUnreachable(f"{self.name} has no model to answer: HTTP 404: {detail}") from error
             raise ProviderError(f"{self.name} call failed: HTTP {error.code}: {detail}") from error
         except urllib.error.URLError as error:
             raise ProviderUnreachable(f"{self.name} could not be reached: {error}") from error

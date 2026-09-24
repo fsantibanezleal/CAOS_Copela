@@ -296,6 +296,10 @@ R-043  WHEN the property layer raises a stated number, THE layer SHALL raise eve
        covers the largest fraction of, and SHALL raise a quantity covering two numbers equally with
        neither.
        Gate: tests/test_dynamics.py::test_a_stated_number_raises_every_quantity_it_produced
+
+R-044  IF the provider answers that the model or the endpoint does not exist, THEN THE sweep SHALL
+       treat the call as one that never reached a model: it SHALL stop and SHALL NOT record it.
+       Gate: tests/test_unreachable.py::test_a_local_model_that_is_not_there_is_unreachable
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -431,6 +435,13 @@ quantity whose span overlapped its own, which was a state with no salt in it. A 
 raises everything its words produced, in both documents, and a candidate quantity goes with the words
 it covers most, or with none.
 
+R-044 came from the drive that held a local model store going offline in the middle of Enunciado's
+second repeat. The server stayed up and answered every call with HTTP 404, "model not found", and
+R-035 counted any HTTP answer as the provider's answer about the call, so nine calls were recorded as
+the model's failures before the chain stopped. A model that is not there answered nothing. The nine
+rows were moved out of the ledger into a discard file, and a 404 now stops a sweep like a refused
+connection does, from a local server, an HTTP provider or an SDK's NotFoundError.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -441,6 +452,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | R-001 to R-041 | all pass, no skips (0.07.000); each dynamics gate mutation-checked (six mutations, six caught) |
 | R-001 to R-042 | all pass, no skips (0.08.000); nine mutations of the dynamics layers, nine caught |
 | R-001 to R-043 | all pass, no skips (0.08.001); twelve mutations of the dynamics layers, twelve caught |
+| R-001 to R-044 | all pass, no skips (0.08.002); three mutations of the 404 rule, three caught |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 
