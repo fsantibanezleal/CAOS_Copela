@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.06.000] - 2026-09-24
+
+### Changed
+
+- **A call that never reached the model stops the sweep and is not recorded (R-035).** A new
+  `ProviderUnreachable`, a `ProviderError`, raised when the connection fails before any response
+  (a refused connection, an unresolved name, a TLS failure, a connect timeout) or when the provider
+  answers 401 or 403. The sweep stops on it, keeps every call it recorded before, and a resume picks
+  up at the failed call. An HTTP 500, a malformed body and a read timeout are still answers about
+  this call and are still recorded. Recording the first kind put rows about a key file into a ledger
+  as rows about the model; a network that drops mid-sweep would have done the same until the kill
+  criterion.
+- The stub provider takes `unreachable_after`, to drop its connection after that many calls.
+
 ## [0.05.000] - 2026-09-24
 
 ### Added
