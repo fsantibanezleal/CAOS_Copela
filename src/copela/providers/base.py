@@ -58,6 +58,31 @@ class ProviderError(RuntimeError):
     """A call failed. Carried into the ledger as an executable-layer failure, never swallowed."""
 
 
+class ProviderUnreachable(ProviderError):
+    """The call never reached the model: the connection failed before any response, or the provider
+    refused the credentials. It says nothing about the model, so a sweep stops on it and records
+    nothing (R-035).
+
+    The distinction is the response. An HTTP 500 is the provider's answer to this call and is
+    recorded like any failure; a connection refused, a name that did not resolve, a TLS failure or a
+    401 is the harness failing to ask. Recording those wrote rows about a network or a key file into
+    an append-only ledger, as rows about the model.
+    """
+
+
+#: The exception names, in the SDKs that copela does not depend on, that mean the request never got
+#: an answer about the model: a transport failure, or rejected credentials.
+UNREACHABLE_NAMES = frozenset(
+    {"APIConnectionError", "APITimeoutError", "AuthenticationError", "PermissionDeniedError"}
+)
+
+
+def unreachable(error: BaseException) -> bool:
+    """Whether an SDK exception means the call never reached the model. Read by class name along the
+    exception's MRO, so a subclass counts and no SDK has to be imported to ask."""
+    return any(cls.__name__ in UNREACHABLE_NAMES for cls in type(error).__mro__)
+
+
 class Provider(abc.ABC):
     """The only way the harness reaches a language model."""
 
@@ -105,11 +130,15 @@ class StubProvider(Provider):
         default: str = "",
         pricing: Pricing | None = None,
         fail_on: set[str] | None = None,
+        unreachable_after: int | None = None,
     ) -> None:
         self._responses = responses or {}
         self._default = default
         self._pricing = pricing or Pricing(input_per_mtok=1.0, output_per_mtok=5.0)
         self._fail_on = fail_on or set()
+        #: After this many calls, every further call fails to reach the provider, as a network does
+        #: when it drops in the middle of a sweep.
+        self._unreachable_after = unreachable_after
         self.calls: list[tuple[str, str, float, int | None]] = []
 
     def complete(
@@ -121,6 +150,8 @@ class StubProvider(Provider):
         seed: int | None = None,
         max_tokens: int = 4096,
     ) -> Completion:
+        if self._unreachable_after is not None and len(self.calls) >= self._unreachable_after:
+            raise ProviderUnreachable("stub configured to lose its connection")
         self.calls.append((prompt, model_id, temperature, seed))
         if model_id in self._fail_on:
             raise ProviderError(f"stub configured to fail for {model_id!r}")
