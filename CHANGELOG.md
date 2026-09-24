@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.09.000] - 2026-09-24
+
+### Added
+
+- **`Sweep.score(candidate, case)`, public (R-045).** The layers a sweep applies to one candidate,
+  with no call made and the ledger untouched. With the document every record has carried since
+  0.5.0, `sweep.score(Problem.from_json(record.candidate), case)` gives a recorded candidate's
+  verdicts under the installed copela and planteo, so what a release would change on a finished
+  measurement can be counted before the release is used on it.
+
 ## [0.08.002] - 2026-09-24
 
 ### Fixed
