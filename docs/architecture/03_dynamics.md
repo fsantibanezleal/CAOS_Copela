@@ -106,13 +106,24 @@ The obvious dynamics analogue, rescaling time, holds for any model by constructi
 nothing. The dynamics relation instead uses what planteo has and other representations do not: the
 citation from a parameter to the words of the statement.
 
-For each number cited by both the reference and the candidate (their spans overlap), both parameters
-are raised by the same factor, $p_j \mapsto 1.05\,p_j$, both systems are integrated again, and the
-responses of every shared question at its asked time are compared:
+A stated number is the words it was written in, and it can produce more than one quantity: "1 mol/L
+of A" is A's initial value and, in a formalization by conservation, the total as well. So the
+relation works on stated numbers, not on quantities:
+
+- reference quantities whose spans overlap are one stated number $j$, with the set $P^{r}_j$ of
+  quantities it produced;
+- a candidate quantity belongs to the stated number whose words it covers the largest fraction of,
+  $\max_j |s \cap w_j| / |w_j|$; one that covers two numbers equally, such as a span running over a
+  whole sentence, belongs to neither and is left out, because raising it with the wrong number
+  would compare a change the statement never made. $P^{c}_j$ is the set that belongs to $j$.
+
+Every quantity in $P^{r}_j$ and in $P^{c}_j$ is raised by the same factor,
+$p \mapsto 1.05\,p$, both systems are integrated again, and the responses of every shared question
+at its asked time are compared:
 
 $$
-\Delta^{r}_{j} = Q^{r}(\tau;\, 1.05\,p^{r}_j) - Q^{r}(\tau;\, p^{r}), \qquad
-\Delta^{c}_{j} = Q^{c}(\tau;\, 1.05\,p^{c}_j) - Q^{c}(\tau;\, p^{c}).
+\Delta^{r}_{j} = Q^{r}(\tau;\, 1.05\,P^{r}_j) - Q^{r}(\tau), \qquad
+\Delta^{c}_{j} = Q^{c}(\tau;\, 1.05\,P^{c}_j) - Q^{c}(\tau).
 $$
 
 Where the reference responds ($|\Delta^{r}_j| > 10^{-7}\,|Q^{r}|$), the candidate is refuted if it
@@ -122,6 +133,11 @@ rises is not the system described, whatever its value at the asked time. The tes
 (R-039) is built to have exactly the right value at 20 minutes: its inflow is
 $0.16\,\text{kg}^2/\text{L}^2 \cdot q / c_{in}$, which equals $c_{in} q$ at the stated
 $c_{in} = 0.4$ and moves the opposite way when it changes.
+
+Raising one quantity per number, as 0.08.000 did, refuted correct formalizations. On a reaction
+$A \to B \to C$ written with $C = a_0 - a - b$, raising only A's initial value lowers $C$ while
+the reference's $C$ rises. Enunciado's hand-written alternatives of its twenty dynamics cases found
+it before any model did.
 
 This is metamorphic testing (Segura et al. 2016) with the relation derived from the reference
 rather than authored per case. With no number cited by both, or no question asked by both, the
