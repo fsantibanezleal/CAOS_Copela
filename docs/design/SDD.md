@@ -83,7 +83,8 @@ published finding.
 Every call appends one JSONL record carrying: case id, family, provider, model id, model version,
 temperature, seed, provider fingerprint, prompt digest, repeat index, latency, token counts,
 estimated cost, the raw response digest, every layer's verdict, and, from schema 1.1, the copela
-version that scored it and the output cap it ran at (R-033).
+version that scored it and the output cap it ran at (R-033), and, from schema 1.2, the candidate's
+document whole whenever the response parsed (R-034).
 
 Append-only. A run is never edited, because a ledger that can be rewritten is not evidence.
 
@@ -236,6 +237,10 @@ R-032  IF a candidate is unbounded, THEN THE property layer SHALL report not-app
 R-033  WHEN a sweep records a call, THE record SHALL carry the copela version that scored it and the
        output cap the call ran at.
        Gate: tests/test_ledger.py::test_a_sweep_records_its_harness_and_its_cap
+
+R-034  WHEN a response parses into a problem, THE record SHALL carry the problem's document whole, and
+       SHALL carry none for a response that did not parse.
+       Gate: tests/test_ledger.py::test_a_sweep_records_the_candidate_document
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -324,6 +329,13 @@ R-033 came from the same day. Enunciado's one ledger held records scored by cope
 one had scored it; and its report had to assume the output cap, because a record could not state
 its own. Records now carry both. A record written before schema 1.1 loads with both empty, which a
 reader must take as unknown.
+
+R-034 came from Enunciado's finished measurement. The ledger kept a digest of every response and an
+excerpt of the failed ones, so 30 of its 34 faithful verdicts rested on the property layer alone with
+no way to apply a stronger check to them later, and two refutations turned out to be candidates that
+counted in whole units against a continuous reference, which could be established only because the
+excerpts of those failures happened to keep the declarations. A record now carries the document the
+verdicts were reached on.
 
 ## 10. Convergence
 
