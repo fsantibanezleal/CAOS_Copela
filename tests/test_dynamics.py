@@ -367,3 +367,37 @@ def test_a_quantity_belongs_to_the_number_whose_words_it_covers() -> None:
     candidate = _reservoir(words, rain, "hour, and a pump removes 200")
     result = dynamics.provenance(candidate, reference, run(candidate), run(reference))
     assert result.outcome is Outcome.PASS and result.detail.startswith("3 response"), result.detail
+
+
+def test_the_answer_at_the_asked_time_is_what_execution_accuracy_sees() -> None:
+    """R-046: each shared question's value at the asked time, in the reference's units. The held
+    tank gives the right number and is a different model; the tank counted in hours and grams gives
+    the right number in minutes and kilograms; a diverging system gives no answer at all."""
+    reference = tank()
+    held = tank(
+        Constant(0.0, KG_PER_MIN),
+        quantities=tuple(dataclasses.replace(q, value=ANALYTIC) if q.name == "x" else q for q in QUANTITIES),
+    )
+    (answer,) = dynamics.answers(held, reference)
+    assert answer.question == "salt_after_20_min" and answer.at == 20.0
+    assert answer.candidate == pytest.approx(ANALYTIC, rel=1e-7) and answer.agrees_to(4)
+    assert dynamics.structural(held, reference, run(held), run(reference)).outcome is Outcome.FAIL
+
+    converted = tank(
+        quantities=_restated(t=("h", 0.5), q=("L/h", 300.0), x=("g", 2000.0), c_in=("g/L", 400.0)),
+        queries=(Query(Ref("x"), 1 / 3, name="salt_after_20_min"),),
+    )
+    (answer,) = dynamics.answers(converted, reference)
+    assert answer.candidate == pytest.approx(ANALYTIC, rel=1e-6)
+
+    per_kg_min = Dimension.of("1/(kg min)", mass=-1, time=-1)
+    assert dynamics.answers(tank(Product((Ref("x"), Ref("x"), Constant(1.0, per_kg_min)))), reference) == []
+
+
+def test_four_significant_figures_is_half_a_unit_of_the_fourth() -> None:
+    """R-046: 26.02 is 26.0206 to four figures and 26.03 is not; the rule scales with the number."""
+    assert dynamics.Answer("q", 20.0, 26.02, 26.0206).agrees_to(4)
+    assert not dynamics.Answer("q", 20.0, 26.03, 26.0206).agrees_to(4)
+    assert dynamics.Answer("q", 20.0, 0.0038796, 0.0038796).agrees_to(4)
+    assert not dynamics.Answer("q", 20.0, 0.003881, 0.0038796).agrees_to(4)
+    assert dynamics.Answer("q", 20.0, 13527.0, 13526.63).agrees_to(4)

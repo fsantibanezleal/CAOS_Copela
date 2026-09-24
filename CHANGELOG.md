@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.10.000] - 2026-09-24
+
+### Added
+
+- **`dynamics.answers(candidate, reference)` (R-046).** Each question both documents ask, answered by
+  each at the asked time in the reference's units, paired as the structural layer pairs them, with
+  `Answer.agrees_to(figures)`: the single-number comparison a benchmark that scores one answer makes,
+  so a measurement can report it beside the layers from the same records.
+
 ## [0.09.000] - 2026-09-24
 
 ### Added
