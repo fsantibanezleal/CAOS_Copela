@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.06.001] - 2026-09-24
+
+### Added
+
+- **Two agent skills in `skills/` (R-036).** `author-sdd` writes a software design document before
+  development, with every requirement in EARS form and naming the gate that fails when it is
+  violated; it ships a product SDD template, a feature template and the repository's own SDD guard.
+  `run-sweep` runs a narrative-to-formal sweep with a runner that refuses before it spends or locks
+  (no price, no budget, a failed probe), stops without recording on an unreachable provider, and
+  resumes; it ships a working example study. A test runs both scripts. No change to the library.
+
 ## [0.06.000] - 2026-09-24
 
 ### Changed
