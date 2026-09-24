@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.05.000] - 2026-09-24
+
+### Added
+
+- **Each record carries the candidate's document, whole (R-034).** A new field, `candidate`, and
+  ledger schema `copela-ledger/1.2`: the planteo document the response parsed into, or `null` when it
+  did not parse. The verdicts said what the layers concluded and nothing about what they concluded it
+  of, so a stronger check written later could not be applied to a recorded candidate. In Enunciado's
+  finished measurement 30 of the 34 faithful verdicts rested on the property layer alone for that
+  reason, and two refutations that were a reading the statement allowed could be established only
+  from failure excerpts that happened to keep the declarations. A record written before 1.2 loads
+  with `candidate` empty.
+
 ## [0.04.001] - 2026-09-23
 
 Documentation only; no code changes to the library. CI now also checks that `VERSION`, the manifest
