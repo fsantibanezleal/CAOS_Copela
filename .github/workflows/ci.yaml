@@ -42,3 +42,18 @@ jobs:
 
       - name: The SDD gate, every requirement names its verification
         run: python scripts/check_sdd.py
+
+      - name: VERSION, the manifest and __version__ agree
+        # The publish workflow checks this on the release tag, which is the first place 0.04.001
+        # was caught: VERSION still said 0.04.000 after pyproject and __version__ had moved, the
+        # release was already cut, and it had to be recreated. Checking on every trunk push fails
+        # the PR instead.
+        run: |
+          set -euo pipefail
+          file_version="$(tr -d ' \r\n' < VERSION)"
+          expected="$(python -c "print('.'.join(str(int(p)) for p in '${file_version}'.split('.')))")"
+          manifest="$(python -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")"
+          package="$(python -c "import copela;print(copela.__version__)")"
+          echo "VERSION=${file_version} expected=${expected} pyproject=${manifest} __version__=${package}"
+          test "${manifest}" = "${expected}"
+          test "${package}" = "${expected}"
