@@ -73,10 +73,16 @@ def test_a_refused_connection_is_unreachable() -> None:
 def test_rejected_credentials_are_unreachable_and_a_server_error_is_not(status, unreached) -> None:
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802, the stdlib's name
+            # Read the request before answering. A server that replies with the body unread and
+            # closes makes Windows reset the connection under the client, which the client then
+            # (rightly) reports as unreachable: the 500 case failed that way one run in three.
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            body = b'{"error": {"message": "no"}}'
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(b'{"error": {"message": "no"}}')
+            self.wfile.write(body)
 
         def log_message(self, *args) -> None:
             pass

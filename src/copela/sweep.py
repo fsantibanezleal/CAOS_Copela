@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from planteo import Problem, Sense, validate
+from planteo import Family, Problem, Sense, validate
 
 from .budget import Budget, BudgetExceeded, UnpricedModel, estimate
 from .ledger import CallKey, Ledger, Record, digest
@@ -211,6 +211,25 @@ class Sweep:
                 )
             )
             return results
+
+        # A formalization of the wrong kind of problem runs as nothing the case asked for.
+        if case.reference is not None and candidate.family is not case.reference.family:
+            results.append(
+                LayerResult(
+                    Layer.EXECUTABLE,
+                    Outcome.FAIL,
+                    f"the candidate's family is {candidate.family.value} and the case's is "
+                    f"{case.reference.family.value}",
+                )
+            )
+            return results
+
+        if candidate.family is Family.DYNAMICS:
+            # The dynamics layers integrate with SciPy rather than the injected optimization solver
+            # (R-037 to R-040): the answer is a trajectory, not an optimum.
+            from .oracles import dynamics
+
+            return dynamics.score(candidate, case.reference)
 
         if self.solve is None:
             results.append(

@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "family": "optimization",
   "narrative": {
     "text": "A plant blends ore from two pits. Pit A costs 12 USD per tonne and pit B costs 9 USD per tonne. Together they must deliver at least 100 tonnes. Minimise the total cost.",
@@ -152,5 +152,6 @@
     "created": "",
     "notes": ""
   },
-  "feasibility_only": false
+  "feasibility_only": false,
+  "queries": []
 }

@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.07.000] - 2026-09-24
+
+### Added
+
+- **The dynamics layers (R-037 to R-041).** A candidate of planteo's dynamics family, a system of
+  ODEs with questions attached, is scored by `copela.oracles.dynamics` instead of the optimization
+  layers, with no solver injected. Executable: SciPy's LSODA integrates to every question's time with
+  finite values. Structural: equal canonical forms pass; otherwise every question both documents ask
+  is compared on 61 points across the whole shared range plus the asked time, and a difference
+  anywhere refutes, so a candidate right at the asked time and wrong elsewhere is caught. Property:
+  each number the statement states and both documents cite is raised by 5% in both, and an answer
+  that does not move, or moves the other way, refutes. Design and equations in
+  `docs/architecture/03_dynamics.md`.
+- A candidate of another family than its case's reference fails the executable layer (R-041).
+
+### Changed
+
+- Requires planteo 0.2.0, which adds the dynamics family; SciPy joins the `solvers`, `all` and `dev`
+  extras.
+
+### Fixed
+
+- A diverging system no longer hangs the sweep. LSODA does not stop on its own when a state
+  overflows: on x' = x^2 it retried one step for over 2.8 million evaluations. The rate of change is
+  checked at every evaluation (a divergence fails), and an integration is bounded at 100,000
+  evaluations (beyond that it is unmeasured, the instrument's limit).
+- A test server in `test_unreachable.py` answered before reading the request, which on Windows reset
+  the connection under the client about one run in three; it now reads the body and sends a length.
+
 ## [0.06.001] - 2026-09-24
 
 ### Added
