@@ -304,6 +304,11 @@ R-044  IF the provider answers that the model or the endpoint does not exist, TH
 R-045  THE harness SHALL score a recorded candidate document with the layers a sweep applies, without
        a call, and the verdicts SHALL equal those the sweep stored when the rules have not changed.
        Gate: tests/test_rescore.py::test_a_recorded_candidate_scores_to_its_stored_verdicts
+
+R-046  THE dynamics layers SHALL give each question a candidate and its reference both ask, answered by
+       each at the asked time in the reference's units, paired as the structural layer pairs them,
+       and SHALL say whether the two agree to a given number of significant figures.
+       Gate: tests/test_dynamics.py::test_the_answer_at_the_asked_time_is_what_execution_accuracy_sees
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -451,6 +456,12 @@ the call can be applied to it, and the scoring a sweep applies was a private met
 `Sweep.score`, and Enunciado uses it to rescore a recorded measurement under a new release and report
 every verdict the release would change before deciding whether to use it.
 
+R-046 lets a measurement set execution accuracy beside the layers on the same records. A benchmark
+that scores one number at one time, as MAMO scores its ODE problems to four significant figures,
+counts a candidate that holds the right value at the asked time and the wrong one everywhere else.
+The structural layer refutes it; what that benchmark would have said is now a number too, computed by
+the same pairing, not restated elsewhere.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -463,6 +474,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | R-001 to R-043 | all pass, no skips (0.08.001); twelve mutations of the dynamics layers, twelve caught |
 | R-001 to R-044 | all pass, no skips (0.08.002); three mutations of the 404 rule, three caught |
 | R-001 to R-045 | all pass, no skips (0.09.000) |
+| R-001 to R-046 | all pass, no skips (0.10.000); three mutations of the answers, three caught |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

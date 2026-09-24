@@ -143,6 +143,15 @@ This is metamorphic testing (Segura et al. 2016) with the relation derived from 
 rather than authored per case. With no number cited by both, or no question asked by both, the
 relation does not apply and says so (NOT_APPLICABLE), which is not a pass.
 
+## What execution accuracy would say
+
+`dynamics.answers(candidate, reference)` returns each shared question answered by both at the asked
+time, in the reference's units, paired exactly as the structural layer pairs them. `agrees_to(4)` is
+the comparison a benchmark that asks for four significant figures makes: within half a unit of the
+fourth figure, $|Q^{c}(\tau) - Q^{r}(\tau)| \le \tfrac{1}{2}\,10^{\lfloor \log_{10} |Q^{r}(\tau)| \rfloor - 3}$.
+It is reported beside the layers, never instead of them: the held candidate in the figure above
+agrees to every figure and is refuted.
+
 ## Judge
 
 Recorded for comparability, never counted, as for optimization.

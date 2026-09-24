@@ -345,4 +345,47 @@ def score(candidate: Problem, reference: Problem | None) -> list[LayerResult]:
     return results
 
 
-__all__ = ["Simulation", "executable", "provenance", "score", "simulate", "structural"]
+@dataclass(frozen=True)
+class Answer:
+    """One question both documents ask, answered by each at the asked time, in the reference's units."""
+
+    question: str
+    at: float
+    candidate: float
+    reference: float
+
+    def agrees_to(self, figures: int) -> bool:
+        """The candidate's answer is the reference's to ``figures`` significant figures: within half
+        a unit of the last one, which is how a benchmark that asks for "4 significant figures"
+        compares a single number."""
+        if self.reference == 0.0:
+            return self.candidate == 0.0
+        unit = 10.0 ** (math.floor(math.log10(abs(self.reference))) - (figures - 1))
+        return abs(self.candidate - self.reference) <= 0.5 * unit
+
+
+def answers(candidate: Problem, reference: Problem) -> list[Answer]:
+    """What execution accuracy compares: each shared question's value at the asked time (R-046).
+
+    Paired exactly as the structural layer pairs them (the same time in seconds, the same
+    dimension) and converted into the reference's units when both symbols can be read. This is the
+    single number a benchmark that scores one answer would check, and it is reported beside the
+    layers so that a candidate that gives the right number as a different model can be counted, not
+    only described. Empty when either document does not integrate, or they share no question.
+    """
+    try:
+        cand, ref = simulate(candidate), simulate(reference)
+    except NotEvaluable:
+        return []
+    if not (cand.ok and ref.ok):
+        return []
+    to_c, to_r = _clocks(cand, ref)
+    out = []
+    for cand_name, ref_name, at in _pairs(cand, ref):
+        mine, _theirs, back = _in_si(cand, ref, cand_name, ref_name)
+        value = back(mine(cand.value(cand_name, at * to_r / to_c)))  # type: ignore[misc]
+        out.append(Answer(ref_name, at, float(value), float(ref.value(ref_name, at))))  # type: ignore[misc]
+    return out
+
+
+__all__ = ["Answer", "Simulation", "answers", "executable", "provenance", "score", "simulate", "structural"]
