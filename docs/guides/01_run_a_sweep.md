@@ -123,7 +123,31 @@ stopped and costs nothing for the work already done.
 sweep.run(cases, targets)   # 0 calls if nothing is left
 ```
 
-## 7. Read the gap
+## 7. What each record keeps
+
+One JSON line per call:
+
+- the provenance: model, version, temperature, seed, fingerprint, prompt digest and repeat;
+- the cost and the tokens;
+- every layer's verdict;
+- the copela version that scored the call and its output cap (`harness`, `max_tokens`);
+- an excerpt of the response when the call failed;
+- from 0.5.0, the candidate's document whole whenever the response parsed (`candidate`).
+
+The document is what lets a check written after the sweep be applied to what the model wrote, rather
+than only to the verdicts about it:
+
+```python
+from planteo import Problem
+
+for record in Ledger("runs.jsonl"):
+    if record.candidate is not None:
+        problem = Problem.from_json(record.candidate)   # the same problem the layers judged
+```
+
+A record from before 0.5.0 has no document, and reads `None`.
+
+## 8. Read the gap
 
 ```bash
 copela report runs.jsonl

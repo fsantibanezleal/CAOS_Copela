@@ -25,8 +25,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-#: 1.1 adds `harness` and `max_tokens`; a 1.0 record still loads, with both empty.
-LEDGER_SCHEMA = "copela-ledger/1.1"
+#: 1.1 adds `harness` and `max_tokens`; 1.2 adds `candidate`. An older record still loads, with
+#: what it lacks empty.
+LEDGER_SCHEMA = "copela-ledger/1.2"
 
 
 class LedgerError(RuntimeError):
@@ -85,6 +86,17 @@ class Record:
     #: Records written before schema 1.1 load with both empty: unknown, not guessed.
     harness: str = ""
     max_tokens: int = 0
+    #: The candidate the response parsed into, as its document, whole (R-034). None when the
+    #: response did not parse, or the record predates schema 1.2.
+    #:
+    #: The verdicts say what the layers concluded and nothing about what they concluded it of. A
+    #: stronger check written later could not be applied to a recorded candidate, because the ledger
+    #: kept a digest of every response and an excerpt of the failed ones only; so most of a
+    #: published faithfulness rate rested on the one layer that had run, with no way to re-examine
+    #: it. And two refutations that turned out to be a reading the statement allowed, whole numbers
+    #: against a continuous reference, could be established only from excerpts that happened to
+    #: keep the declarations. It is kept whole because a truncated document cannot be re-checked.
+    candidate: dict[str, object] | None = None
 
     def to_json(self) -> dict[str, object]:
         data = {
@@ -111,6 +123,7 @@ class Record:
             or datetime.now(UTC).isoformat(timespec="seconds"),
             "harness": self.harness,
             "max_tokens": self.max_tokens,
+            "candidate": self.candidate,
         }
         return data
 
@@ -140,6 +153,7 @@ class Record:
             recorded_at=str(data.get("recorded_at", "")),
             harness=str(data.get("harness", "")),
             max_tokens=int(data.get("max_tokens", 0)),  # type: ignore[arg-type]
+            candidate=data.get("candidate"),  # type: ignore[arg-type]
         )
 
 
