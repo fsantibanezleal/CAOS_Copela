@@ -120,9 +120,9 @@ Run it again. Calls already in the ledger are skipped, so an interrupted sweep c
 stopped and costs nothing for the work already done.
 
 A sweep also stops by itself when a call cannot reach a model: a refused connection, a name that
-does not resolve, a key the provider rejects, or a model the provider says does not exist (HTTP 404)
-raises `ProviderUnreachable`, and that call is not recorded, because it says nothing about the
-model. Fix the connection, the key or the model store and run it again; it picks up at the call that
+does not resolve, a key the provider rejects, a model the provider says does not exist (HTTP 404), or
+a connection the server closes while the answer is being read raises `ProviderUnreachable`, and that
+call is not recorded, because it says nothing about the model. Fix the connection, the key or the model store and run it again; it picks up at the call that
 failed. A provider's own error, an HTTP 500, is its answer to
 that call and is recorded like any failure.
 

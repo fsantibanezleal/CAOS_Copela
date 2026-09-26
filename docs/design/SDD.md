@@ -309,6 +309,10 @@ R-046  THE dynamics layers SHALL give each question a candidate and its referenc
        each at the asked time in the reference's units, paired as the structural layer pairs them,
        and SHALL say whether the two agree to a given number of significant figures.
        Gate: tests/test_dynamics.py::test_the_answer_at_the_asked_time_is_what_execution_accuracy_sees
+
+R-047  IF the provider closes the connection while the answer is being read, THEN THE call SHALL be
+       reported as unreachable, SHALL NOT be recorded, and the sweep SHALL stop.
+       Gate: tests/test_unreachable.py::test_a_connection_dropped_mid_answer_is_unreachable
 ```
 
 R-013 to R-033 were added after the fact, which is worth recording rather than tidying away. The corpus
@@ -462,6 +466,12 @@ counts a candidate that holds the right value at the asked time and the wrong on
 The structural layer refutes it; what that benchmark would have said is now a number too, computed by
 the same pairing, not restated elsewhere.
 
+R-047 came from a local server whose process was stopped in the middle of a call: it read the request
+and closed without answering. A `ConnectionError` raised while the answer is being read is not a
+`URLError`, so the read escaped the sweep as a crash instead of stopping it as unreachable, and the
+case joins R-040 and R-044 as a call that says nothing about the model. A read that times out after
+connecting is still the model taking too long, and stays a recorded failure.
+
 ## 10. Convergence
 
 Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
@@ -475,6 +485,7 @@ Recorded for 0.01.000 on 2026-09-22, per ADR-0075.
 | R-001 to R-044 | all pass, no skips (0.08.002); three mutations of the 404 rule, three caught |
 | R-001 to R-045 | all pass, no skips (0.09.000) |
 | R-001 to R-046 | all pass, no skips (0.10.000); three mutations of the answers, three caught |
+| R-001 to R-047 | all pass, no skips (0.10.001); the dropped-connection rule exercised on both lanes against a real socket |
 | The SDD gate | `scripts/check_sdd.py` passes; every named gate exists |
 | Lint | ruff clean |
 

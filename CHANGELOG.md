@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are `X.XX.XXX` in this file, the
 git tag and any interface string, and the semver form with zeros dropped in `pyproject.toml`.
 
+## [0.10.001] - 2026-09-26
+
+### Fixed
+
+- **A connection the server closes while the answer is being read is unreachable, not a crash
+  (R-047).** A local server stopped in the middle of a call reads the request and closes without
+  answering; the `ConnectionError` that raises is not a `URLError`, so it escaped the sweep instead of
+  stopping it. Both lanes now raise `ProviderUnreachable`, the call is not recorded, and the sweep
+  stops, as for a refused connection or a missing model. A read that times out after connecting is
+  unchanged and stays a recorded failure.
+
 ## [0.10.000] - 2026-09-24
 
 ### Added
