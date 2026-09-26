@@ -403,6 +403,10 @@ class OllamaProvider(Provider):
             # No response at all: the server is down or the host is wrong. A read that times out
             # after connecting is the model taking too long, and stays a recorded failure.
             raise ProviderUnreachable(f"ollama could not be reached at {self._host}: {error}") from error
+        except ConnectionError as error:
+            # The connection dropped while the answer was being read: the server went away mid-call,
+            # and no model answered (R-047). A read that times out is not this, and stays recorded.
+            raise ProviderUnreachable(f"ollama dropped the connection at {self._host}: {error}") from error
         except (TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"ollama call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
@@ -538,6 +542,9 @@ class ChatCompletionsProvider(Provider):
             raise ProviderError(f"{self.name} call failed: HTTP {error.code}: {detail}") from error
         except urllib.error.URLError as error:
             raise ProviderUnreachable(f"{self.name} could not be reached: {error}") from error
+        except ConnectionError as error:
+            # Dropped while the answer was being read: no model answered (R-047).
+            raise ProviderUnreachable(f"{self.name} dropped the connection: {error}") from error
         except (TimeoutError, json.JSONDecodeError) as error:
             raise ProviderError(f"{self.name} call failed: {error}") from error
         latency_ms = (time.perf_counter() - started) * 1000
