@@ -139,3 +139,31 @@ def test_sdk_errors_are_read_by_name_along_the_mro() -> None:
     assert unreachable(APITimeoutError("slow to connect"))
     assert unreachable(NotFoundError("no such model"))
     assert not unreachable(RateLimitError("429"))
+
+
+@pytest.mark.parametrize("lane", ["ollama", "deepseek"])
+def test_a_connection_dropped_mid_answer_is_unreachable(lane) -> None:
+    """R-047: the server reads the request and closes without answering, as a local server did when
+    its process was stopped in the middle of a call. No model answered; the sweep stops."""
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802, the stdlib's name
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.close_connection = True  # and no response at all
+
+        def log_message(self, *args) -> None:
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}"
+        provider = (
+            OllamaProvider(host=url, timeout_s=5)
+            if lane == "ollama"
+            else DeepSeekProvider(api_key="not-a-key", base_url=url, timeout_s=5)
+        )
+        with pytest.raises(ProviderUnreachable, match="dropped the connection"):
+            provider.complete("hello", model_id="some-model", max_tokens=8)
+    finally:
+        server.shutdown()
